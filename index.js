@@ -1447,7 +1447,7 @@ app.get("/monthly_rising_stars", async (req, res) => {
 app.get("/heading_marquee_text",async(req,res)=>{
   const client = await dbConnect()
   const db = client.db(db_database.deal_bondhu_database)
-  const headingCollection = db.collection(db_collections.heading_collection)
+  const headingCollection = db.collection(db_collections.heading_marquee_collection)
   res.send({})
 })
 

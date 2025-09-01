@@ -15,8 +15,8 @@ const db_collections = {
   products: "products",
   clicked_products: "clicked_products",
   liked_products: "liked_products",
-  swiper_speed : "swiper_speed"
-
+  swiper_speed : "swiper_speed",
+  heading_marquee_collection : 'heading_marquee_collection'
 };
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
