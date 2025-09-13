@@ -1451,6 +1451,16 @@ app.get("/heading_marquee_text",async(req,res)=>{
   res.send({})
 })
 
+app.put("/update_heading_marquee_text",async(req,res)=>{
+  const body = req.body
+  const {en,bn} = body
+  
+  const client = await dbConnect()
+  const db = client.db(db_database.deal_bondhu_database)
+  const headingCollection = db.collection(db_collections.heading_marquee_collection)
+  res.send({})
+})
+
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
