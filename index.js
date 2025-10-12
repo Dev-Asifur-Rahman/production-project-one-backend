@@ -972,12 +972,10 @@ app.post("/upload_category_subcategory", async (req, res) => {
     const { categoryName, name, en, bn, icon = "" } = body;
 
     if (!categoryName || !name || !bn) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "CategoryName, name, and bn are required",
-        });
+      return res.status(400).send({
+        success: false,
+        message: "CategoryName, name, and bn are required",
+      });
     }
 
     const category = await category_collections.findOne({
@@ -1444,22 +1442,30 @@ app.get("/monthly_rising_stars", async (req, res) => {
   }
 });
 
-app.get("/heading_marquee_text",async(req,res)=>{
-  const client = await dbConnect()
-  const db = client.db(db_database.deal_bondhu_database)
-  const headingCollection = db.collection(db_collections.heading_marquee_collection)
-  res.send({})
-})
+app.get("/heading_marquee_text", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const headingCollection = db.collection(
+    db_collections.heading_marquee_collection
+  );
 
-app.put("/update_heading_marquee_text",async(req,res)=>{
-  const body = req.body
-  const {en,bn} = body
-  
-  const client = await dbConnect()
-  const db = client.db(db_database.deal_bondhu_database)
-  const headingCollection = db.collection(db_collections.heading_marquee_collection)
-  res.send({})
-})
+  const heading_marquee_text = await headingCollection.findOne({
+    _id: new ObjectId("69648510939043762034fa26"),
+  });
+  res.send(heading_marquee_text);
+});
+
+app.put("/update_heading_marquee_text", async (req, res) => {
+  const body = req.body;
+  const { en, bn } = body;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const headingCollection = db.collection(
+    db_collections.heading_marquee_collection
+  );
+  res.send({});
+});
 
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
