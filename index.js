@@ -1464,7 +1464,19 @@ app.put("/update_heading_marquee_text", async (req, res) => {
   const headingCollection = db.collection(
     db_collections.heading_marquee_collection
   );
-  res.send({});
+
+  const updateDoc = {
+    $set: {
+      en,
+      bn,
+    },
+  };
+
+  const result = await headingCollection.updateOne(
+    { _id: new ObjectId("69648510939043762034fa26") },
+    updateDoc
+  );
+  res.send(result);
 });
 
 // app.get("/operation", async (req, res) => {
