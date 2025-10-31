@@ -150,6 +150,8 @@ app.get("/get_products/:category", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const product_collections = db.collection(db_collections.products);
+  const liked_products = db.collection(db_collections.liked_products)
+  const commented_products = db.collection(db_collections.product_comments)
 
   const filter = { category };
 
@@ -337,6 +339,8 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
 
   const clicked_collection = db.collection(db_collections.clicked_products);
   const product_collection = db.collection(db_collections.products);
+  const liked_collection = db.collection(db_collections.liked_products);
+  const comment_collection = db.collection(db_collections.product_comments);
 
   const cookie_user_id = req.body?.user_id;
   const lastOneMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -356,15 +360,19 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
       .limit(10)
       .toArray();
 
+    for (let i = 0; i < result.length; i++) {
+      const product = result[i];
+      product.likes = await liked_collection.countDocuments({ product_id: product._id.toString() });
+      product.comments = await comment_collection.countDocuments({ product_id: product._id.toString() });
+    }
+
     return res.send(result);
   }
 
   let subcategory_score = {};
 
   all_clicks.forEach((click) => {
-    const daysAgo =
-      (Date.now() - new Date(click.clicked_at)) / (1000 * 3600 * 24);
-
+    const daysAgo = (Date.now() - new Date(click.clicked_at)) / (1000 * 3600 * 24);
     let weight = 0;
     if (daysAgo <= 1) weight = 1;
     else if (daysAgo <= 2) weight = 0.9;
@@ -403,8 +411,17 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
     products.forEach((p) => usedIds.add(p._id.toString()));
     finalProducts.push(...products);
   }
+
+  for (let i = 0; i < finalProducts.length; i++) {
+    const product = finalProducts[i];
+    product.likes = await liked_collection.countDocuments({ product_id: product._id.toString() });
+    product.comments = await comment_collection.countDocuments({ product_id: product._id.toString() });
+  }
+
   return res.send(finalProducts);
 });
+
+
 
 app.post("/upload_click_products", async (req, res) => {
   const client = await dbConnect();
@@ -611,9 +628,14 @@ app.get("/trending_categories", async (req, res) => {
 app.get("/trending_stores", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
+
   const product_collection = db.collection(db_collections.products);
   const clicked_products_collection = db.collection(
     db_collections.clicked_products
+  );
+  const liked_products = db.collection(db_collections.liked_products);
+  const commented_product_collection = db.collection(
+    db_collections.product_comments
   );
 
   const now = new Date();
@@ -666,7 +688,9 @@ app.get("/trending_stores", async (req, res) => {
               $map: {
                 input: "$counts",
                 as: "c",
-                in: { $cond: [{ $eq: ["$$c.day", "today"] }, "$$c.clicks", 0] },
+                in: {
+                  $cond: [{ $eq: ["$$c.day", "today"] }, "$$c.clicks", 0],
+                },
               },
             },
           },
@@ -676,33 +700,17 @@ app.get("/trending_stores", async (req, res) => {
                 input: "$counts",
                 as: "c",
                 in: {
-                  $cond: [{ $eq: ["$$c.day", "yesterday"] }, "$$c.clicks", 0],
+                  $cond: [
+                    { $eq: ["$$c.day", "yesterday"] },
+                    "$$c.clicks",
+                    0,
+                  ],
                 },
               },
             },
           },
         },
       },
-      // {
-      //   $match: {
-      //     todayClicks: { $gte: 1 },
-      //     yesterdayClicks: { $gt: 0 },
-      //     $expr: { $gte: [{ $divide: ["$todayClicks", "$yesterdayClicks"] }, 1.5] }
-      //   }
-      // },
-
-      // {
-      //   $addFields: {
-      //     trendingScore: {
-      //       $multiply: [
-      //         { $divide: ["$todayClicks", "$yesterdayClicks"] },
-      //         "$todayClicks",
-      //       ],
-      //     },
-      //   },
-      // },
-
-      // this step is for testing
       {
         $match: {
           todayClicks: { $gte: 1 },
@@ -736,20 +744,34 @@ app.get("/trending_stores", async (req, res) => {
           },
         },
       },
-      // start after this
       { $sort: { trendingScore: -1 } },
       { $limit: 10 },
     ])
     .toArray();
 
-  const product_ids = trending_pipeline.map((item) => new ObjectId(item._id));
+  const product_ids = trending_pipeline.map(
+    (item) => new ObjectId(item._id)
+  );
 
   const top_products = await product_collection
     .find({ _id: { $in: product_ids } })
     .toArray();
 
+  for (let i = 0; i < top_products.length; i++) {
+    const product = top_products[i];
+
+    product.likes = await liked_products.countDocuments({
+      product_id: product._id.toString(),
+    });
+
+    product.comments = await commented_product_collection.countDocuments({
+      product_id: product._id.toString(),
+    });
+  }
+
   res.send(top_products);
 });
+
 
 app.post("/like_product", async (req, res) => {
   const client = await dbConnect();
