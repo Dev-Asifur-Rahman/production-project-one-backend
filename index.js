@@ -149,9 +149,10 @@ app.get("/get_products/:category", async (req, res) => {
 
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
+
   const product_collections = db.collection(db_collections.products);
-  const liked_products = db.collection(db_collections.liked_products)
-  const commented_products = db.collection(db_collections.product_comments)
+  const liked_products = db.collection(db_collections.liked_products);
+  const commented_products = db.collection(db_collections.product_comments);
 
   const filter = { category };
 
@@ -160,8 +161,22 @@ app.get("/get_products/:category", async (req, res) => {
   }
 
   const result = await product_collections.find(filter).toArray();
+
+  for (let i = 0; i < result.length; i++) {
+    const product = result[i];
+
+    product.likes = await liked_products.countDocuments({
+      product_id: product._id.toString(),
+    });
+
+    product.comments = await commented_products.countDocuments({
+      product_id: product._id.toString(),
+    });
+  }
+
   res.send(result);
 });
+
 
 app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
@@ -421,8 +436,6 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
   return res.send(finalProducts);
 });
 
-
-
 app.post("/upload_click_products", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
@@ -459,8 +472,11 @@ app.post("/upload_click_products", async (req, res) => {
 app.get("/popular_deals", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
+
   const clicked_products = db.collection(db_collections.clicked_products);
   const product_collection = db.collection(db_collections.products);
+  const liked_products = db.collection(db_collections.liked_products);
+  const commented_products = db.collection(db_collections.product_comments);
 
   const last_seven_date = new Date();
   last_seven_date.setDate(last_seven_date.getDate() - 7);
@@ -533,8 +549,23 @@ app.get("/popular_deals", async (req, res) => {
   const popular_products = await clicked_products
     .aggregate(popular_deals_pipeline)
     .toArray();
+
+  for (let i = 0; i < popular_products.length; i++) {
+    const product = popular_products[i];
+
+    product.likes = await liked_products.countDocuments({
+      product_id: product._id.toString(),
+    });
+
+    product.comments = await commented_products.countDocuments({
+      product_id: product._id.toString(),
+    });
+  }
+
   res.send(popular_products);
 });
+
+
 
 app.get("/trending_categories", async (req, res) => {
   const client = await dbConnect();
