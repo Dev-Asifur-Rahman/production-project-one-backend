@@ -625,6 +625,7 @@ app.get("/trending_categories", async (req, res) => {
         },
       ])
       .toArray();
+
     const subcategoryScores = subcategory_pipeline.reduce((acc, item) => {
       const cat = item._id.category;
       const subcat = item._id.subcategory;
@@ -646,11 +647,14 @@ app.get("/trending_categories", async (req, res) => {
 
       return acc;
     }, {});
+
     const scoredSubcategories = Object.values(subcategoryScores).map((data) => {
       const avgClicksPerProduct =
         data.productCount > 0 ? data.thisWeek / data.productCount : 0;
 
-      const growth = data.lastWeek ? data.thisWeek / data.lastWeek : 1;
+      const growth = data.lastWeek
+        ? data.thisWeek / data.lastWeek
+        : 1;
 
       return {
         category: data.category,
@@ -669,28 +673,36 @@ app.get("/trending_categories", async (req, res) => {
       .find({ name: { $in: categoryNames } })
       .toArray();
 
-    const subcategoryIconMap = {};
+    const subcategoryMetaMap = {};
 
     categories.forEach((cat) => {
       cat.subcategories?.forEach((sub) => {
-        subcategoryIconMap[`${cat.name}||${sub.en}`] = sub.icon;
+        subcategoryMetaMap[`${cat.name}||${sub.en}`] = {
+          icon: sub.icon || "",
+          bn: sub.bn || "",
+        };
       });
     });
 
     const finalResult = scoredSubcategories.map((item) => {
       const key = `${item.category}||${item.subcategory}`;
+      const meta = subcategoryMetaMap[key] || {};
+
       return {
-        ...item,
-        icon: subcategoryIconMap[key] || "",
+        category: item.category,
+        subcategory: item.subcategory,
+        bn: meta.bn || "",
+        icon: meta.icon || "",
+        score: item.score,
       };
     });
 
     res.send(finalResult);
   } catch (error) {
-    console.error(error);
     res.status(500).send({ message: "Something went wrong" });
   }
 });
+
 
 app.get("/trending_stores", async (req, res) => {
   const client = await dbConnect();
