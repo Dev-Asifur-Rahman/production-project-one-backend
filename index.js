@@ -1,12 +1,12 @@
 require('dotenv').config();
 
 // route files 
-const users = require('./users.js')
+const users = require('./routes/users.js')
 
 const express = require('express')
 const cors = require('cors');
 
-// const { connectDb } = require('./mongodb.js');
+// const { connectDb } = require('./config/mongodb.js');
 
 const app = express()
 const PORT = process.env.PORT || 5000
