@@ -1,28 +1,51 @@
-require('dotenv').config();
+require("dotenv").config();
 
-// route files 
-const users = require('./routes/users.js')
+// route files
+const users = require("./routes/users.js");
 
-const express = require('express')
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
+const maxmind = require("maxmind");
+const user_agent = require("useragent");
 
 // const { connectDb } = require('./config/mongodb.js');
 
-const app = express()
-const PORT = process.env.PORT || 5000
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
+app.set("trust proxy", true);
 
 // connectDb()
+let lookup;
 
-app.get('/',(req,res)=>{
-    res.send('slick deals backend')
-})
+(async () => {
+  try {
+    lookup = await maxmind.open("./db/GeoLite2-City.mmdb");
+  } catch (error) {
+    console.error("Failed to load MaxMind DB:", error);
+  }
+})();
 
-// using routes 
-app.use('/users',users)
+app.get("/", async (req, res) => {
+  agent = user_agent.parse(req.headers["user-agent"]);
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress ||
+    req.ip;
 
-app.listen(PORT,()=>{
-    console.log('app is running on port')
-})
+  if (!lookup) {
+    return res.send({ message: "Geo info not ready! try later" });
+  }
+
+  const geo = lookup.get(ip) || {};
+  res.send({ agent, geo, ip });
+});
+
+// using routes
+app.use("/users", users);
+
+app.listen(PORT, () => {
+  console.log("app is running on port");
+});
