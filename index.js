@@ -42,7 +42,7 @@ app.get("/track-user", async (req, res) => {
   res.send({ agent, geo, ip });
 });
 
-app.get('post-track-info',async (req,res)=>{
+app.get('/post-track-info',async (req,res)=>{
     res.send('Post Track Info')
 })
 
