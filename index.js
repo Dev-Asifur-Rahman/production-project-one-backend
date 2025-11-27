@@ -29,16 +29,15 @@ let lookup;
 })();
 
 app.get("/", async (req, res) => {
+  res.send("Deal Bondhu Backend Server is Running");
+});
+
+app.get("/track-user", async (req, res) => {
   agent = user_agent.parse(req.headers["user-agent"]);
   const ip =
     req.headers["x-forwarded-for"]?.split(",")[0] ||
     req.socket.remoteAddress ||
     req.ip;
-
-  if (!lookup) {
-    return res.send({ message: "Geo info not ready! try later" });
-  }
-
   const geo = lookup.get(ip) || {};
   res.send({ agent, geo, ip });
 });
