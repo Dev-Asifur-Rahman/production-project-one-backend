@@ -1,37 +1,41 @@
-const database = {
-  //    data base names will be here for auto suggestion
+const databases = {
+  deal_bondhu: "deal_bondhu",
 };
 
 const collections = {
-  //    collections names will be here for auto suggestion
+  clicked_user_info_collection: "clicked_user_info",
+  products: "products",
 };
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = process.env.MONGO_URI;
 
-const db_instance = {};
+let client;
+let isConnected = false;
 
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
+// this function is used to connect to the database
 
 async function connectDb() {
-  await client.connect();
+  // if already stored in client then returns
+  if (isConnected && client) return client;
 
-  // load all databases
-  for (const singleDatabase in database) {
-    db_instance[singleDatabase] = client.db(database[singleDatabase]);
+  // this will work for first time if not stored in client
+  if (!client) {
+    client = new MongoClient(uri, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
   }
 
-  return db_instance;
-}
+  if (!isConnected) {
+    await client.connect();
+    isConnected = true;
+    console.log('Connect to Database')
+  }
 
-function getDB(database_name) {
-  return db_instance[database_name];
+  return client;
 }
-
-module.exports = { database, collections, getDB, connectDb };
+module.exports = { connectDb, databases, collections };
