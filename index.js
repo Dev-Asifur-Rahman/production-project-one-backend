@@ -197,14 +197,82 @@ app.post("/upload_click_products", async (req, res) => {
 });
 
 app.get("/popular_deals", async (req, res) => {
-  res.send("hello");
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const user_product_collection = db.collection(collections.clicked_products);
+  const product_collection = db.collection(collections.products);
+
+  const last_seven_date = new Date();
+  last_seven_date.setDate(last_seven_date.getDate() - 7);
+
+  const popular_deals_pipeline = [
+    {
+      $match: {
+        clicked_at: { $gte: last_seven_date },
+      },
+    },
+    {
+      $addFields: {
+        daysAgo: {
+          $dateDiff: {
+            startDate: "$clicked_at",
+            endDate: new Date(),
+            unit: "day",
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        weight: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$daysAgo", 0] }, then: 1.0 },
+              { case: { $eq: ["$daysAgo", 1] }, then: 0.9 },
+              { case: { $in: ["$daysAgo", [2, 3]] }, then: 0.8 },
+              { case: { $in: ["$daysAgo", [4, 5]] }, then: 0.7 },
+              { case: { $in: ["$daysAgo", [6, 7]] }, then: 0.6 },
+            ],
+            default: 0,
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$product_id",
+        popularityScore: { $sum: "$weight" },
+        totalClicks: { $sum: 1 },
+      },
+    },
+    {
+      $sort: { popularityScore: -1 },
+    },
+    {
+      $limit: 10,
+    },
+  ];
+
+  const top_product_objects = await user_product_collection
+    .aggregate(popular_deals_pipeline)
+    .toArray();
+
+  const product_ids = top_product_objects.map(
+    (object) => new ObjectId(object._id)
+  );
+
+  const top_products = await product_collection
+    .find({ _id: { $in: product_ids } })
+    .toArray();
+
+  res.send(top_products);
 });
 
 app.get("/trending_categories", async (req, res) => {
   res.send("hello");
 });
 
-app.get("/trending_store", async (req, res) => {
+app.get("/trending_stores", async (req, res) => {
   res.send("hello");
 });
 
