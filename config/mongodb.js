@@ -5,7 +5,8 @@ const databases = {
 const collections = {
   clicked_user_info_collection: "clicked_user_info",
   products: "products",
-  clicked_products : 'clicked_products'
+  clicked_products : 'clicked_products',
+  liked_products : "liked_products"
 };
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
