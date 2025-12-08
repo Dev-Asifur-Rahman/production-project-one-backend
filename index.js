@@ -45,14 +45,30 @@ app.get("/clicked_user_data", async (req, res) => {
   res.send(data);
 });
 
-app.get("/get_products", async (req, res) => {
+app.get("/get_products/:category", async (req, res) => {
+  const rawCategory = req.params.category;
+  const rawSubcategory = req.query.subcategory;
+
+  const category = decodeURIComponent(rawCategory).toLowerCase();
+  const subcategory = rawSubcategory
+    ? decodeURIComponent(rawSubcategory).toLowerCase()
+    : null;
+
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
   const product_collections = db.collection(collections.products);
 
-  const result = await product_collections.find({}).toArray();
+  const filter = { category };
+
+  if (subcategory !== 'undefined') {
+    filter.subcategory = subcategory;
+  }
+
+
+  const result = await product_collections.find(filter).toArray();
   res.send(result);
 });
+
 
 app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
