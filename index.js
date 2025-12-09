@@ -60,15 +60,13 @@ app.get("/get_products/:category", async (req, res) => {
 
   const filter = { category };
 
-  if (subcategory !== 'undefined') {
+  if (subcategory !== "undefined") {
     filter.subcategory = subcategory;
   }
-
 
   const result = await product_collections.find(filter).toArray();
   res.send(result);
 });
-
 
 app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
@@ -159,7 +157,7 @@ app.post("/upload_product", async (req, res) => {
   res.send(result);
 });
 
-// get all clicks by last one month
+// get all clicks by last one month (just for you)
 app.post("/recent_clicks", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -177,7 +175,21 @@ app.post("/recent_clicks", async (req, res) => {
     .toArray();
 
   if (all_clicks.length === 0) {
-    const result = await product_collection.find({}).limit(10).toArray();
+    const result =  await product_collection
+      .aggregate([
+        {
+          $addFields: {
+            offer_percent_num: { $toInt: "$offer_percent" },
+          },
+        },
+        {
+          $sort: { offer_percent_num: -1 },
+        },
+        {
+          $limit: 10,
+        },
+      ])
+      .toArray();
 
     return res.send(result);
   }
@@ -300,7 +312,7 @@ app.get("/popular_deals", async (req, res) => {
 
   const top_products = await product_collection
     .find({ _id: { $in: product_ids } })
-    .limit(4)
+    .limit(7)
     .toArray();
 
   res.send(top_products);
@@ -309,9 +321,7 @@ app.get("/popular_deals", async (req, res) => {
 app.get("/trending_categories", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
-  const clicked_product_collection = db.collection(
-    collections.clicked_products
-  );
+  const clicked_product_collection = db.collection(collections.clicked_products);
 
   const today = new Date();
   const sevenDaysAgo = new Date(today);
@@ -320,7 +330,8 @@ app.get("/trending_categories", async (req, res) => {
   const fourteenDaysAgo = new Date(today);
   fourteenDaysAgo.setDate(today.getDate() - 14);
 
-  const category_pipeline = await clicked_product_collection
+  // Aggregation pipeline
+  const subcategory_pipeline = await clicked_product_collection
     .aggregate([
       {
         $match: {
@@ -330,6 +341,7 @@ app.get("/trending_categories", async (req, res) => {
       {
         $project: {
           category: 1,
+          subcategory: 1,
           product_id: 1,
           week: {
             $cond: [
@@ -342,7 +354,7 @@ app.get("/trending_categories", async (req, res) => {
       },
       {
         $group: {
-          _id: { category: "$category", week: "$week" },
+          _id: { category: "$category", subcategory: "$subcategory", week: "$week" },
           totalClicks: { $sum: 1 },
           products: { $addToSet: "$product_id" },
         },
@@ -350,26 +362,38 @@ app.get("/trending_categories", async (req, res) => {
     ])
     .toArray();
 
-  const categoryScores = category_pipeline.reduce((acc, item) => {
+  // Reduce to calculate scores
+  const subcategoryScores = subcategory_pipeline.reduce((acc, item) => {
     const cat = item._id.category;
+    const subcat = item._id.subcategory;
+    const key = `${cat}||${subcat}`; // unique key
     const week = item._id.week;
-    if (!acc[cat]) acc[cat] = { thisWeek: 0, lastWeek: 0, productCount: 0 };
 
-    acc[cat][week] = item.totalClicks;
-    acc[cat].productCount = item.products.length;
+    if (!acc[key]) acc[key] = { category: cat, subcategory: subcat, thisWeek: 0, lastWeek: 0, productCount: 0 };
+
+    acc[key][week] = item.totalClicks;
+    acc[key].productCount = item.products.length;
+
     return acc;
   }, {});
 
-  const scoredCategories = Object.entries(categoryScores).map(([cat, data]) => {
+  // Calculate score
+  const scoredSubcategories = Object.values(subcategoryScores).map((data) => {
     const avgClicksPerProduct = data.thisWeek / data.productCount;
     const growth = data.lastWeek ? data.thisWeek / data.lastWeek : 1;
-    return { category: cat, score: avgClicksPerProduct * growth };
+    return {
+      category: data.category,
+      subcategory: data.subcategory,
+      score: avgClicksPerProduct * growth,
+    };
   });
 
-  scoredCategories.sort((a, b) => b.score - a.score);
-  // const topCategories = scoredCategories.slice(0, 8);
-  res.send(scoredCategories);
+  // Sort descending
+  scoredSubcategories.sort((a, b) => b.score - a.score);
+
+  res.send(scoredSubcategories);
 });
+
 
 app.get("/trending_stores", async (req, res) => {
   const client = await connectDb();
