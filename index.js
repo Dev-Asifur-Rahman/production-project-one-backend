@@ -10,6 +10,11 @@ const user_agent = require("useragent");
 const getLookUp = require("./config/lookupDbLoad");
 const { connectDb, databases, collections } = require("./config/mongodb.js");
 const { ObjectId } = require("mongodb");
+const {
+  dbConnect,
+  db_database,
+  db_collections,
+} = require("./config/dealBondhuDB.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -175,7 +180,7 @@ app.post("/recent_clicks", async (req, res) => {
     .toArray();
 
   if (all_clicks.length === 0) {
-    const result =  await product_collection
+    const result = await product_collection
       .aggregate([
         {
           $addFields: {
@@ -321,7 +326,9 @@ app.get("/popular_deals", async (req, res) => {
 app.get("/trending_categories", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
-  const clicked_product_collection = db.collection(collections.clicked_products);
+  const clicked_product_collection = db.collection(
+    collections.clicked_products
+  );
 
   const today = new Date();
   const sevenDaysAgo = new Date(today);
@@ -354,7 +361,11 @@ app.get("/trending_categories", async (req, res) => {
       },
       {
         $group: {
-          _id: { category: "$category", subcategory: "$subcategory", week: "$week" },
+          _id: {
+            category: "$category",
+            subcategory: "$subcategory",
+            week: "$week",
+          },
           totalClicks: { $sum: 1 },
           products: { $addToSet: "$product_id" },
         },
@@ -369,7 +380,14 @@ app.get("/trending_categories", async (req, res) => {
     const key = `${cat}||${subcat}`; // unique key
     const week = item._id.week;
 
-    if (!acc[key]) acc[key] = { category: cat, subcategory: subcat, thisWeek: 0, lastWeek: 0, productCount: 0 };
+    if (!acc[key])
+      acc[key] = {
+        category: cat,
+        subcategory: subcat,
+        thisWeek: 0,
+        lastWeek: 0,
+        productCount: 0,
+      };
 
     acc[key][week] = item.totalClicks;
     acc[key].productCount = item.products.length;
@@ -393,7 +411,6 @@ app.get("/trending_categories", async (req, res) => {
 
   res.send(scoredSubcategories);
 });
-
 
 app.get("/trending_stores", async (req, res) => {
   const client = await connectDb();
@@ -551,6 +568,29 @@ app.post("/like_product", async (req, res) => {
   };
 
   const result = await liked_collection.insertOne(document_object);
+  res.send(result);
+});
+app.get("/pending_products", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const pending_product_collection = db.collection(
+    db_collections.pending_products
+  );
+  const result = await pending_product_collection.find({}).toArray();
+  res.send(result)
+});
+
+app.post("/upload_pending_product", async (req, res) => {
+  const body = req.body;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const pending_product_collection = db.collection(
+    db_collections.pending_products
+  );
+
+  const result = await pending_product_collection.insertOne(body);
+
   res.send(result);
 });
 
