@@ -6,6 +6,8 @@ const db_collections = {
    archive_products : 'archive_products',
    users : 'users',
    pending_products : 'pending_products',
+   banners : 'banners',
+   categories : 'categories'
 
 }
 

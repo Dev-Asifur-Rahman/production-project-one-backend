@@ -15,6 +15,8 @@ const {
   db_database,
   db_collections,
 } = require("./config/dealBondhuDB.js");
+const archiveChecker = require("./middleware/archiveChecker.js");
+const archive_product_delete = require("./middleware/archiveProductDelete.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -148,22 +150,52 @@ app.post("/post_track_info", async (req, res) => {
   res.send(result);
 });
 
-app.post("/upload_product", async (req, res) => {
-  const product = req.body;
+app.post("/approve_pending_product/:id", async (req, res) => {
+  const { id } = req.params;
 
   const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collection = db.collection(collections.products);
+  const db_client = await dbConnect();
 
-  const result = await product_collection.insertOne({
-    ...product,
-    created_at: new Date(),
+  const db = client.db(databases.deal_bondhu);
+  const db_db = db_client.db(db_database.deal_bondhu_database);
+
+  const product_collection = db.collection(collections.products);
+  const pending_product_collection = db_db.collection(
+    db_collections.pending_products
+  );
+
+  const find_product = await pending_product_collection.findOne({
+    _id: new ObjectId(id),
   });
+  if (find_product) {
+    const { _id, validation, status, ...modified_product } = find_product;
+    const product = {
+      ...modified_product,
+      validation,
+      status: "approved",
+      created_at: new Date(),
+      archive_at: new Date(
+        Date.now() + (validation || 0) * 24 * 60 * 60 * 1000
+      ),
+      delete_at: new Date(
+        Date.now() + ((validation || 0) + 5) * 24 * 60 * 60 * 1000
+      ),
+    };
+    const delete_product = await pending_product_collection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    const result = await product_collection.insertOne(product);
+    res.send(result);
+  } else {
+    return { success: false, message: "product not found" };
+  }
+
   res.send(result);
 });
 
 // get all clicks by last one month (just for you)
-app.post("/recent_clicks", async (req, res) => {
+app.post("/recent_clicks", archiveChecker, async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
   const clicked_collection = db.collection(collections.clicked_products);
@@ -570,6 +602,7 @@ app.post("/like_product", async (req, res) => {
   const result = await liked_collection.insertOne(document_object);
   res.send(result);
 });
+
 app.get("/pending_products", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
@@ -577,7 +610,7 @@ app.get("/pending_products", async (req, res) => {
     db_collections.pending_products
   );
   const result = await pending_product_collection.find({}).toArray();
-  res.send(result)
+  res.send(result);
 });
 
 app.post("/upload_pending_product", async (req, res) => {
@@ -592,6 +625,176 @@ app.post("/upload_pending_product", async (req, res) => {
   const result = await pending_product_collection.insertOne(body);
 
   res.send(result);
+});
+
+app.get("/single_pending_product/:id", async (req, res) => {
+  const id = req.params;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const pending_product_collection = db.collection(
+    db_collections.pending_products
+  );
+
+  const result = await pending_product_collection.findOne({
+    _id: new ObjectId(id.id),
+  });
+  res.send(result);
+});
+
+app.patch("/update_pending_product/:id", async (req, res) => {
+  const { id } = req.params;
+  const product = req.body;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const pending_product_collection = db.collection(
+    db_collections.pending_products
+  );
+
+  const result = await pending_product_collection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: product }
+  );
+  res.send(result);
+});
+
+app.get("/archive_products", archive_product_delete, async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const archive_collection = db.collection(db_collections.archive_products);
+
+  const result = await archive_collection.find({}).toArray();
+  res.send(result);
+});
+
+app.delete("/delete_archive_product/:id", async (req, res) => {
+  const { id } = req.params;
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const archive_collection = db.collection(db_collections.archive_products);
+
+  const product = await archive_collection.findOne({ _id: new ObjectId(id) });
+
+  if (!product) {
+    return res.send({ success: false, message: "no product found" });
+  }
+
+  const result = await archive_collection.deleteOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
+
+app.post("/upload_category_subcategory", async (req, res) => {
+  const category = req.query.category;
+  const subcategory = req.query.subcategory;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const category_collections = db.collection(db_collections.categories);
+
+  if (!category && !subcategory) {
+    return res.send({
+      success: false,
+      message: "Category or Subcategory is required",
+    });
+  }
+
+  if (!category && subcategory) {
+    return res.send({
+      success: false,
+      message: "Category is required to add subcategory",
+    });
+  }
+
+  if (category && !subcategory) {
+    const existingCategory = await category_collections.findOne({
+      name: { $regex: `^${category}$`, $options: "i" },
+    });
+
+    if (existingCategory) {
+      return res.send({
+        success: false,
+        message: "Category already exists",
+      });
+    }
+
+    await category_collections.insertOne({
+      name: category,
+      subcategories: [],
+    });
+
+    return res.send({
+      success: true,
+      message: "Category added successfully",
+    });
+  }
+
+  if (category && subcategory) {
+    let existingCategory = await category_collections.findOne({
+      name: { $regex: `^${category}$`, $options: "i" },
+    });
+
+    if (existingCategory) {
+      const duplicateSub = existingCategory.subcategories.find(
+        (sub) => sub.toLowerCase() === subcategory.toLowerCase()
+      );
+
+      if (duplicateSub) {
+        return res.send({
+          success: false,
+          message: "Subcategory already exists in this category",
+        });
+      }
+
+      await category_collections.updateOne(
+        { _id: existingCategory._id },
+        { $push: { subcategories: subcategory } }
+      );
+
+      return res.send({
+        success: true,
+        message: "Subcategory added to existing category",
+      });
+    } else {
+      await category_collections.insertOne({
+        name: category,
+        subcategories: [subcategory],
+      });
+
+      return res.send({
+        success: true,
+        message: "Category and Subcategory created successfully",
+      });
+    }
+  }
+});
+
+app.get("/banners", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const banner_collections = db.collection(db_collections.banners);
+
+  const result = await banner_collections.find({}).toArray();
+  res.send(result);
+});
+
+app.delete("/delete_banner/:id", async (req, res) => {
+  const { id } = req.params;
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const banner_collections = db.collection(db_collections.banners);
+
+  const banner = await banner_collections.find({ _id: new ObjectId(id) });
+
+  if (!banner) {
+    res.send({ success: false, message: "no banner found" });
+  } else {
+    const result = await banner_collections.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send(result);
+  }
 });
 
 // using routes
