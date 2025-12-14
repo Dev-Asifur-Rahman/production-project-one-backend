@@ -7,7 +7,9 @@ const db_collections = {
    users : 'users',
    pending_products : 'pending_products',
    banners : 'banners',
-   categories : 'categories'
+   categories : 'categories',
+   product_comments : 'product_comments',
+   unliked_products : 'unliked_products'
 
 }
 
