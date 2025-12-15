@@ -9,7 +9,8 @@ const db_collections = {
    banners : 'banners',
    categories : 'categories',
    product_comments : 'product_comments',
-   unliked_products : 'unliked_products'
+   unliked_products : 'unliked_products',
+   saved_products : 'saved_products'
 
 }
 

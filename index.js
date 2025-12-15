@@ -153,9 +153,18 @@ app.get("/get_product/:id", async (req, res) => {
   const clicked_collection = db.collection(collections.clicked_products);
   const unliked_collection = db_db.collection(db_collections.unliked_products);
   const comment_collection = db_db.collection(db_collections.product_comments);
+  const saved_product_collection = db_db.collection(
+    db_collections.saved_products
+  );
 
   let liked = false;
   let unliked = false;
+  let isSaved = false;
+
+  const saved = await saved_product_collection.findOne({
+    product_id: id,
+    user_id: visitor_id,
+  });
 
   const existing_like = await liked_collection.findOne({
     user_id: visitor_id,
@@ -187,6 +196,10 @@ app.get("/get_product/:id", async (req, res) => {
     unliked = true;
   }
 
+  if (saved) {
+    isSaved = true;
+  }
+
   const get_product = await product_collection.findOne({
     _id: new ObjectId(id),
   });
@@ -199,6 +212,7 @@ app.get("/get_product/:id", async (req, res) => {
     unlike_count,
     comment_count,
     click_count,
+    isSaved
   };
 
   res.send(product);
@@ -983,6 +997,22 @@ app.delete("/delete_banner/:id", async (req, res) => {
 
     res.send(result);
   }
+});
+
+app.post("/upload_saved_product", async (req, res) => {
+  const body = req.body;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const saved_product_collection = db.collection(db_collections.saved_products);
+
+  const saved_product_object = {
+    ...body,
+    saved_at: new Date(),
+  };
+
+  const result = await saved_product_collection.insertOne(saved_product_object);
+  res.send(result);
 });
 
 // using routes
