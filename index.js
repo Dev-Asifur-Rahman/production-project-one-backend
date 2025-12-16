@@ -212,7 +212,7 @@ app.get("/get_product/:id", async (req, res) => {
     unlike_count,
     comment_count,
     click_count,
-    isSaved
+    isSaved,
   };
 
   res.send(product);
@@ -953,6 +953,28 @@ app.delete("/delete_category/:id", async (req, res) => {
     });
     res.send(result);
   }
+});
+
+app.delete("/delete_subcategory/:id", async (req, res) => {
+  const { id } = req.params;
+  const subCategory = req.query.subcategory;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const category_collections = db.collection(db_collections.categories);
+
+  const find_category = await category_collections.findOne({
+    _id: new ObjectId(id),
+  });
+  if (!find_category) {
+    return res.send({ success: false, message: "Product not Found" });
+  }
+
+  const result = await category_collections.updateOne(
+    { _id: new ObjectId(id) },
+    { $pull: { subcategory: subCategory } }
+  );
+  res.send(result);
 });
 
 app.get("/banners", async (req, res) => {
