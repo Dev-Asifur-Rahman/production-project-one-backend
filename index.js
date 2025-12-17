@@ -982,7 +982,8 @@ app.get("/banners", async (req, res) => {
   const db = client.db(db_database.deal_bondhu_database);
   const banner_collections = db.collection(db_collections.banners);
 
-  const result = await banner_collections.find({}).toArray();
+  const result = await banner_collections.find({}).sort({ order: 1 }).toArray();
+
   res.send(result);
 });
 
@@ -992,13 +993,62 @@ app.post("/upload_banner", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const banner_collections = db.collection(db_collections.banners);
+  const total_documents = await banner_collections.countDocuments();
 
   const banner = {
     ...object,
+    order: total_documents + 1,
     created_at: new Date(),
   };
 
   const result = await banner_collections.insertOne(banner);
+  res.send(result);
+});
+
+app.patch("/banner_sort", async (req, res) => {
+  const id = req.query.id;
+  const sort_type = req.query.sort;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const banner_collections = db.collection(db_collections.banners);
+
+  const current = await banner_collections.findOne({ _id: new ObjectId(id) });
+
+  if (!current) {
+    return res.send({ message: "Banner not found" });
+  }
+
+  const targetOrder =
+    sort_type === "up"
+      ? current.order - 1
+      : sort_type === "down"
+      ? current.order + 1
+      : null;
+
+  if (targetOrder === null) {
+    return res.send({ message: "Invalid sort type" });
+  }
+
+  if (targetOrder < 1) {
+    return res.send({ success: false, message: "Already at top" });
+  }
+
+  const swap_banner = await banner_collections.findOne({ order: targetOrder });
+  if (!swap_banner) {
+    return res.send({ success: false, message: "banner already in bottom" });
+  }
+
+  await banner_collections.updateOne(
+    { _id: swap_banner._id },
+    { $set: { order: current.order } }
+  );
+
+  const result = await banner_collections.updateOne(
+    { _id: current._id },
+    { $set: { order: targetOrder } }
+  );
+
   res.send(result);
 });
 
@@ -1035,6 +1085,28 @@ app.post("/upload_saved_product", async (req, res) => {
 
   const result = await saved_product_collection.insertOne(saved_product_object);
   res.send(result);
+});
+
+app.delete("/delete_saved_product/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const saved_product_collection = db.collection(db_collections.saved_products);
+
+  const find_saved_product = await saved_product_collection.findOne({
+    _id: new ObjectId(id),
+  });
+
+  if (!find_saved_product) {
+    return res.send({ success: false, message: "Product not Found" });
+  } else {
+    const result = await saved_product_collection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    return res.send(result);
+  }
 });
 
 // using routes
