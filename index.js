@@ -8,7 +8,7 @@ const cors = require("cors");
 const user_agent = require("useragent");
 
 const getLookUp = require("./config/lookupDbLoad");
-const { connectDb, databases, collections } = require("./config/mongodb.js");
+
 const { ObjectId } = require("mongodb");
 const {
   dbConnect,
@@ -42,10 +42,10 @@ app.get("/clicked_user_data", async (req, res) => {
     };
   }
 
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
   const track_info_collection = db.collection(
-    collections.clicked_user_info_collection
+    db_collections.clicked_user_info_collection
   );
 
   const data = await track_info_collection.find(filter).toArray();
@@ -53,9 +53,9 @@ app.get("/clicked_user_data", async (req, res) => {
 });
 
 app.get("/admin_get_products", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const product_collection = db.collection(db_collections.products);
   const result = await product_collection.find({}).toArray();
   res.send(result);
 });
@@ -63,9 +63,9 @@ app.get("/admin_get_products", async (req, res) => {
 app.get("/admin_get_product/:id", async (req, res) => {
   const { id } = req.params;
 
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const product_collection = db.collection(db_collections.products);
 
   const product = await product_collection.findOne({ _id: new ObjectId(id) });
 
@@ -74,13 +74,11 @@ app.get("/admin_get_product/:id", async (req, res) => {
 
 app.post("/archive_existing_product/:id", async (req, res) => {
   const { id } = req.params;
-  const client = await connectDb();
   const db_client = await dbConnect();
 
-  const db = client.db(databases.deal_bondhu);
   const db_db = db_client.db(db_database.deal_bondhu_database);
 
-  const product_collection = db.collection(collections.products);
+  const product_collection = db_db.collection(db_collections.products);
   const archived_collection = db_db.collection(db_collections.archive_products);
 
   const getProduct = await product_collection.findOne({
@@ -104,9 +102,9 @@ app.patch("/update_existing_product/:id", async (req, res) => {
   const { id } = req.params;
   const product = req.body;
 
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const product_collection = db.collection(db_collections.products);
 
   const result = await product_collection.updateOne(
     { _id: new ObjectId(id) },
@@ -124,9 +122,9 @@ app.get("/get_products/:category", async (req, res) => {
     ? decodeURIComponent(rawSubcategory).toLowerCase()
     : null;
 
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collections = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const product_collections = db.collection(db_collections.products);
 
   const filter = { category };
 
@@ -142,15 +140,13 @@ app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
   const visitor_id = req.headers["x-visitor-id"];
 
-  const client = await connectDb();
   const db_client = await dbConnect();
 
-  const db = client.db(databases.deal_bondhu);
   const db_db = db_client.db(db_database.deal_bondhu_database);
 
-  const product_collection = db.collection(collections.products);
-  const liked_collection = db.collection(collections.liked_products);
-  const clicked_collection = db.collection(collections.clicked_products);
+  const product_collection = db_db.collection(db_collections.products);
+  const liked_collection = db_db.collection(db_collections.liked_products);
+  const clicked_collection = db_db.collection(db_collections.clicked_products);
   const unliked_collection = db_db.collection(db_collections.unliked_products);
   const comment_collection = db_db.collection(db_collections.product_comments);
   const saved_product_collection = db_db.collection(
@@ -233,10 +229,10 @@ app.post("/post_track_info", async (req, res) => {
 
   const { product_name, product_link, company } = req.body;
 
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
   const clicked_collection = db.collection(
-    collections.clicked_user_info_collection
+    db_database.clicked_user_info_collection
   );
 
   const user_clicked_info = {
@@ -264,13 +260,10 @@ app.post("/post_track_info", async (req, res) => {
 app.post("/approve_pending_product/:id", async (req, res) => {
   const { id } = req.params;
 
-  const client = await connectDb();
   const db_client = await dbConnect();
-
-  const db = client.db(databases.deal_bondhu);
   const db_db = db_client.db(db_database.deal_bondhu_database);
 
-  const product_collection = db.collection(collections.products);
+  const product_collection = db_db.collection(db_collections.products);
   const pending_product_collection = db_db.collection(
     db_collections.pending_products
   );
@@ -300,10 +293,10 @@ app.post("/approve_pending_product/:id", async (req, res) => {
 
 // get all clicks by last one month (just for you)
 app.post("/recent_clicks", archiveChecker, async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const clicked_collection = db.collection(collections.clicked_products);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const clicked_collection = db.collection(db_collections.clicked_products);
+  const product_collection = db.collection(db_collections.products);
 
   const cookie_user_id = req.body?.user_id;
   const lastOneMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -371,10 +364,10 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
 });
 
 app.post("/upload_click_products", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
   const clicked_products_collection = db.collection(
-    collections.clicked_products
+    db_collections.clicked_products
   );
 
   const clicked_object = req.body;
@@ -387,10 +380,12 @@ app.post("/upload_click_products", async (req, res) => {
 });
 
 app.get("/popular_deals", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const user_product_collection = db.collection(collections.clicked_products);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const user_product_collection = db.collection(
+    db_collections.clicked_products
+  );
+  const product_collection = db.collection(db_collections.products);
 
   const last_seven_date = new Date();
   last_seven_date.setDate(last_seven_date.getDate() - 7);
@@ -460,10 +455,10 @@ app.get("/popular_deals", async (req, res) => {
 });
 
 app.get("/trending_categories", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
   const clicked_product_collection = db.collection(
-    collections.clicked_products
+    db_collections.clicked_products
   );
 
   const today = new Date();
@@ -549,11 +544,11 @@ app.get("/trending_categories", async (req, res) => {
 });
 
 app.get("/trending_stores", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const product_collection = db.collection(collections.products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const product_collection = db.collection(db_collections.products);
   const clicked_products_collection = db.collection(
-    collections.clicked_products
+    db_collections.clicked_products
   );
 
   const now = new Date();
@@ -692,9 +687,9 @@ app.get("/trending_stores", async (req, res) => {
 });
 
 app.post("/like_product", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const liked_collection = db.collection(collections.liked_products);
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const liked_collection = db.collection(db_collections.liked_products);
 
   const { user_id, product_id } = req.body;
   const document_object = {
@@ -1107,6 +1102,37 @@ app.delete("/delete_saved_product/:id", async (req, res) => {
 
     return res.send(result);
   }
+});
+
+app.get("/get_swiper_speed/:id", async (req, res) => {
+  const { id } = req.params;
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const swiper_speed_collection = db.collection(db_collections.swiper_speed);
+
+  const swiper_speed = await swiper_speed_collection.findOne({
+    _id: new ObjectId(id),
+  });
+
+  return res.send(swiper_speed);
+});
+
+app.put("/update_swiper_speed/:id", async (req, res) => {
+  // 6944135c03cea8c48c6d3abd
+  const { id } = req.params;
+  const body = req.body;
+  const {time} = body
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const swiper_speed_collection = db.collection(db_collections.swiper_speed);
+
+  const result = await swiper_speed_collection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { time: time } }
+  );
+
+  return res.send(result);
 });
 
 // using routes

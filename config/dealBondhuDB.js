@@ -1,18 +1,23 @@
 const db_database = {
-    deal_bondhu_database : 'deal_bondhu'
-}
+  deal_bondhu_database: "deal_bondhu",
+};
 
 const db_collections = {
-   archive_products : 'archive_products',
-   users : 'users',
-   pending_products : 'pending_products',
-   banners : 'banners',
-   categories : 'categories',
-   product_comments : 'product_comments',
-   unliked_products : 'unliked_products',
-   saved_products : 'saved_products'
+  archive_products: "archive_products",
+  users: "users",
+  pending_products: "pending_products",
+  banners: "banners",
+  categories: "categories",
+  product_comments: "product_comments",
+  unliked_products: "unliked_products",
+  saved_products: "saved_products",
+  clicked_user_info_collection: "clicked_user_info",
+  products: "products",
+  clicked_products: "clicked_products",
+  liked_products: "liked_products",
+  swiper_speed : "swiper_speed"
 
-}
+};
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = process.env.DB_MONGO_URI;
@@ -38,7 +43,7 @@ async function dbConnect() {
   if (!isConnected) {
     await client.connect();
     isConnected = true;
-    console.log('Connected to deal bondhu Database')
+    console.log("Connected to deal bondhu Database");
   }
 
   return client;
