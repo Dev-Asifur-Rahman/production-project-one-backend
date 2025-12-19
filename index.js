@@ -6,6 +6,7 @@ const users = require("./routes/users.js");
 const express = require("express");
 const cors = require("cors");
 const user_agent = require("useragent");
+const bcrypt = require("bcrypt");
 
 const getLookUp = require("./config/lookupDbLoad");
 
@@ -17,6 +18,7 @@ const {
 } = require("./config/dealBondhuDB.js");
 const archiveChecker = require("./middleware/archiveChecker.js");
 const archive_product_delete = require("./middleware/archiveProductDelete.js");
+const sendMail = require("./utils/sendEmail.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1121,7 +1123,7 @@ app.put("/update_swiper_speed/:id", async (req, res) => {
   // 6944135c03cea8c48c6d3abd
   const { id } = req.params;
   const body = req.body;
-  const {time} = body
+  const { time } = body;
 
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
@@ -1133,6 +1135,106 @@ app.put("/update_swiper_speed/:id", async (req, res) => {
   );
 
   return res.send(result);
+});
+
+app.post("/verify_email/:email", async (req, res) => {
+  const { email } = req.params;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const users_collection = db.collection(db_collections.users);
+
+  const find_user = await users_collection.findOne({
+    email: email,
+    method: "email",
+  });
+
+  if (!find_user) {
+    return res.send({ success: false, message: "Email not Found" });
+  } else {
+    const reset_code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const update_result = await users_collection.updateOne(
+      { email: email, method: "email" },
+      { $set: { reset_code: reset_code } },
+      { upsert: false }
+    );
+
+    if (update_result.acknowledged === true) {
+      const mail_result = await sendMail(email, reset_code);
+      if (mail_result.accepted.length === 0) {
+        await users_collection.updateOne(
+          { email: email, method: "email" },
+          { $unset: { reset_code: "" } }
+        );
+        return res.send({
+          success: false,
+          message: "The Email You Entered Doesn't Exists",
+        });
+      } else {
+        return res.send(mail_result);
+      }
+    } else {
+      return res.send({
+        success: false,
+        message: "Code Send Failed Try Again",
+      });
+    }
+  }
+});
+
+app.post("/verify_reset_code", async (req, res) => {
+  const object = req.body;
+  const { email, code } = object;
+
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const users_collection = db.collection(db_collections.users);
+
+  const find_reset_user = await users_collection.findOne({
+    email,
+    method: "email",
+    reset_code: { $exists: true },
+  });
+
+  if (!find_reset_user) {
+    return res.send({ success: false, message: "Set Your OTP First" });
+  } else {
+    if (find_reset_user?.reset_code !== code) {
+      return res.send({ success: false, message: "Enter Valid OTP" });
+    } else {
+      return res.send({ success: true, message: "Verification Successful" });
+    }
+  }
+});
+
+app.post("/reset_new_password", async (req, res) => {
+  const body = req.body;
+  const { email, password } = body;
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const users_collection = db.collection(db_collections.users);
+
+  const find_user = await users_collection.findOne({
+    email,
+    method: "email",
+    reset_code: { $exists: true },
+  });
+  if (!find_user) {
+    return res.send({ success: false, message: "Send OTP First" });
+  } else {
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const updateResult = await users_collection.updateOne(
+      { email, method: "email" },
+      {
+        $set: { password: hashedPassword },
+        $unset: { reset_code: "" },
+      }
+    );
+    res.send(updateResult);
+  }
 });
 
 // using routes
