@@ -34,7 +34,7 @@ app.get("/", async (req, res) => {
 app.get("/clicked_user_data", async (req, res) => {
   try {
     const search = req.query.search || "all";
-    const date = req.query.date; 
+    const date = req.query.date;
     const limit = parseInt(req.query.limit) || 15;
 
     let filter = {};
@@ -253,7 +253,7 @@ app.post("/post_track_info", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const clicked_collection = db.collection(
-    db_database.clicked_user_info_collection
+    db_collections.clicked_user_info_collection
   );
 
   const user_clicked_info = {
@@ -1135,22 +1135,24 @@ app.post("/upload_saved_product", async (req, res) => {
 
 app.delete("/delete_saved_product/:id", async (req, res) => {
   const { id } = req.params;
+  const user_id = req.query.user_id;
 
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const saved_product_collection = db.collection(db_collections.saved_products);
 
   const find_saved_product = await saved_product_collection.findOne({
-    _id: new ObjectId(id),
+    product_id: id,
+    user_id: user_id,
   });
 
   if (!find_saved_product) {
     return res.send({ success: false, message: "Product not Found" });
   } else {
     const result = await saved_product_collection.deleteOne({
-      _id: new ObjectId(id),
+      product_id: id,
+      user_id: user_id,
     });
-
     return res.send(result);
   }
 });
