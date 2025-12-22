@@ -322,6 +322,7 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
 
   const cookie_user_id = req.body?.user_id;
   const lastOneMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const SIXTY_DAYS = 60 * 24 * 60 * 60 * 1000;
 
   const all_clicks = await clicked_collection
     .find({
@@ -332,19 +333,20 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
 
   if (all_clicks.length === 0) {
     const result = await product_collection
-      .aggregate([
-        { $addFields: { offer_percent_num: { $toInt: "$offer_percent" } } },
-        { $sort: { offer_percent_num: -1 } },
-        { $limit: 10 },
-      ])
+      .find({})
+      .sort({ created_at: -1 })
+      .limit(10)
       .toArray();
+
     return res.send(result);
   }
 
-  let category_score = {};
+  let subcategory_score = {};
+
   all_clicks.forEach((click) => {
     const daysAgo =
       (Date.now() - new Date(click.clicked_at)) / (1000 * 3600 * 24);
+
     let weight = 0;
     if (daysAgo <= 1) weight = 1;
     else if (daysAgo <= 2) weight = 0.9;
@@ -352,67 +354,40 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
     else if (daysAgo <= 14) weight = 0.5;
     else if (daysAgo <= 30) weight = 0.3;
 
-    category_score[click.category] =
-      (category_score[click.category] || 0) + weight;
+    subcategory_score[click.subcategory] =
+      (subcategory_score[click.subcategory] || 0) + weight;
   });
 
-  const topCategories = Object.entries(category_score)
+  const topSubcategories = Object.entries(subcategory_score)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([cat]) => cat);
+    .map(([sub]) => sub);
 
-  const targetSplit =
-    topCategories.length >= 3
-      ? [4, 3, 3]
-      : topCategories.length === 2
-      ? [6, 4]
-      : [10];
+  let distribution = [];
+  if (topSubcategories.length === 1) distribution = [10];
+  else if (topSubcategories.length === 2) distribution = [6, 4];
+  else distribution = [4, 3, 3];
 
-  const SIXTY_DAYS = 60 * 24 * 60 * 60 * 1000;
   let finalProducts = [];
   let usedIds = new Set();
-  let carry = 0;
 
-  for (let i = 0; i < topCategories.length; i++) {
-    if (finalProducts.length >= 10) break;
-
-    const baseTarget = targetSplit[i] || 0;
-    const target = baseTarget + carry;
-    if (target <= 0) continue;
-
+  for (let i = 0; i < topSubcategories.length; i++) {
     const products = await product_collection
       .find({
-        category: topCategories[i],
-        created_at: { $gte: new Date(Date.now() - SIXTY_DAYS) },
-        _id: { $nin: Array.from(usedIds) },
-      })
-      .sort({ created_at: -1 }) // recent products first
-      .limit(target)
-      .toArray();
-
-    products.forEach((p) => usedIds.add(p._id.toString()));
-    finalProducts.push(...products);
-
-    carry = target - products.length;
-  }
-
-  if (finalProducts.length < 10) {
-    const remaining = 10 - finalProducts.length;
-    const fillerProducts = await product_collection
-      .find({
-        category: { $in: topCategories },
+        subcategory: topSubcategories[i],
         created_at: { $gte: new Date(Date.now() - SIXTY_DAYS) },
         _id: { $nin: Array.from(usedIds) },
       })
       .sort({ created_at: -1 })
-      .limit(remaining)
+      .limit(distribution[i])
       .toArray();
 
-    finalProducts.push(...fillerProducts);
+    products.forEach((p) => usedIds.add(p._id.toString()));
+    finalProducts.push(...products);
   }
-
   return res.send(finalProducts);
 });
+
 
 app.post("/upload_click_products", async (req, res) => {
   const client = await dbConnect();
@@ -1287,8 +1262,19 @@ app.post("/reset_new_password", async (req, res) => {
   }
 });
 
+app.get("/operation",async(req,res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const products_collection = db.collection(db_collections.clicked_products);
+  const result = await products_collection
+    .deleteMany({ subcategory: { $exists: false } })
+  return res.send(result);
+});
+
 // using routes
 app.use("/users", users);
+
+
 
 app.listen(PORT, () => {
   console.log("app is running on port");
