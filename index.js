@@ -62,7 +62,7 @@ app.get("/clicked_user_data", async (req, res) => {
     const client = await dbConnect();
     const db = client.db(db_database.deal_bondhu_database);
     const track_info_collection = db.collection(
-      db_collections.clicked_user_info_collection
+      db_collections.clicked_user_info_collection,
     );
 
     const data = await track_info_collection
@@ -133,7 +133,7 @@ app.patch("/update_existing_product/:id", async (req, res) => {
 
   const result = await product_collection.updateOne(
     { _id: new ObjectId(id) },
-    { $set: product }
+    { $set: product },
   );
   res.send(result);
 });
@@ -191,7 +191,7 @@ app.get("/get_product/:id", async (req, res) => {
   const unliked_collection = db_db.collection(db_collections.unliked_products);
   const comment_collection = db_db.collection(db_collections.product_comments);
   const saved_product_collection = db_db.collection(
-    db_collections.saved_products
+    db_collections.saved_products,
   );
 
   let liked = false;
@@ -273,7 +273,7 @@ app.post("/post_track_info", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const clicked_collection = db.collection(
-    db_collections.clicked_user_info_collection
+    db_collections.clicked_user_info_collection,
   );
 
   const user_clicked_info = {
@@ -306,7 +306,7 @@ app.post("/approve_pending_product/:id", async (req, res) => {
 
   const product_collection = db_db.collection(db_collections.products);
   const pending_product_collection = db_db.collection(
-    db_collections.pending_products
+    db_collections.pending_products,
   );
   const users_collection = db_db.collection(db_collections.users);
 
@@ -335,7 +335,7 @@ app.post("/approve_pending_product/:id", async (req, res) => {
     if (find_user) {
       const final_result = await calculatePoints(
         pointCategoryObject.post,
-        find_product?.dealer_id
+        find_product?.dealer_id,
       );
       if (final_result) {
         return res.send({ acknowledged: true });
@@ -448,7 +448,7 @@ app.post("/upload_click_products", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const clicked_products_collection = db.collection(
-    db_collections.clicked_products
+    db_collections.clicked_products,
   );
   const product_collection = db.collection(db_collections.products);
   const users_collections = db.collection(db_collections.users);
@@ -471,7 +471,7 @@ app.post("/upload_click_products", async (req, res) => {
   if (find_user) {
     const final_result = await calculatePoints(
       pointCategoryObject.click,
-      userId
+      userId,
     );
     res.send(final_result);
   }
@@ -578,25 +578,31 @@ app.get("/trending_categories", async (req, res) => {
     const client = await dbConnect();
     const db = client.db(db_database.deal_bondhu_database);
 
-    const clicked_product_collection = db.collection(
-      db_collections.clicked_products
-    );
+    const clicked_product_collection = db.collection(db_collections.clicked_products);
     const category_collection = db.collection(db_collections.categories);
 
     const today = new Date();
-
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
-
     const fourteenDaysAgo = new Date(today);
     fourteenDaysAgo.setDate(today.getDate() - 14);
+
+    function normalizeString(str) {
+      if (!str) return "";
+      return str
+        .toLowerCase()
+        .replace(/’/g, "'")
+        .replace(/‘/g, "'")
+        .replace(/[“”]/g, '"')
+        .trim();
+    }
 
     const subcategory_pipeline = await clicked_product_collection
       .aggregate([
         {
           $match: {
-            clicked_at: { $gte: fourteenDaysAgo, $lte: today },
-          },
+            clicked_at: { $gte: fourteenDaysAgo, $lte: today }
+          }
         },
         {
           $project: {
@@ -604,42 +610,28 @@ app.get("/trending_categories", async (req, res) => {
             subcategory: 1,
             product_id: 1,
             week: {
-              $cond: [
-                { $gte: ["$clicked_at", sevenDaysAgo] },
-                "thisWeek",
-                "lastWeek",
-              ],
-            },
-          },
+              $cond: [{ $gte: ["$clicked_at", sevenDaysAgo] }, "thisWeek", "lastWeek"]
+            }
+          }
         },
         {
           $group: {
-            _id: {
-              category: "$category",
-              subcategory: "$subcategory",
-              week: "$week",
-            },
+            _id: { category: "$category", subcategory: "$subcategory", week: "$week" },
             totalClicks: { $sum: 1 },
-            products: { $addToSet: "$product_id" },
-          },
-        },
+            products: { $addToSet: "$product_id" }
+          }
+        }
       ])
       .toArray();
 
     const subcategoryScores = subcategory_pipeline.reduce((acc, item) => {
-      const cat = item._id.category;
-      const subcat = item._id.subcategory;
+      const cat = normalizeString(item._id.category);
+      const subcat = normalizeString(item._id.subcategory);
       const week = item._id.week;
       const key = `${cat}||${subcat}`;
 
       if (!acc[key]) {
-        acc[key] = {
-          category: cat,
-          subcategory: subcat,
-          thisWeek: 0,
-          lastWeek: 0,
-          productCount: 0,
-        };
+        acc[key] = { category: cat, subcategory: subcat, thisWeek: 0, lastWeek: 0, productCount: 0 };
       }
 
       acc[key][week] = item.totalClicks;
@@ -649,43 +641,33 @@ app.get("/trending_categories", async (req, res) => {
     }, {});
 
     const scoredSubcategories = Object.values(subcategoryScores).map((data) => {
-      const avgClicksPerProduct =
-        data.productCount > 0 ? data.thisWeek / data.productCount : 0;
+      const avgClicksPerProduct = data.productCount > 0 ? data.thisWeek / data.productCount : 0;
+      const growth = data.lastWeek ? data.thisWeek / data.lastWeek : 1;
 
-      const growth = data.lastWeek
-        ? data.thisWeek / data.lastWeek
-        : 1;
-
-      return {
-        category: data.category,
-        subcategory: data.subcategory,
-        score: avgClicksPerProduct * growth,
-      };
+      return { category: data.category, subcategory: data.subcategory, score: avgClicksPerProduct * growth };
     });
 
     scoredSubcategories.sort((a, b) => b.score - a.score);
 
-    const categoryNames = [
-      ...new Set(scoredSubcategories.map((item) => item.category)),
-    ];
+    // Fetch all categories from DB for lookup
+    const allCategories = await category_collection.find().toArray();
 
-    const categories = await category_collection
-      .find({ name: { $in: categoryNames } })
-      .toArray();
-
+    // Map categories & subcategories using normalized strings
     const subcategoryMetaMap = {};
-
-    categories.forEach((cat) => {
+    allCategories.forEach((cat) => {
+      const categoryKey = normalizeString(cat.name);
       cat.subcategories?.forEach((sub) => {
-        subcategoryMetaMap[`${cat.name}||${sub.en}`] = {
+        const subKey = normalizeString(sub.en);
+        subcategoryMetaMap[`${categoryKey}||${subKey}`] = {
           icon: sub.icon || "",
-          bn: sub.bn || "",
+          bn: sub.bn || ""
         };
       });
     });
 
+    // Final result with bn + icon
     const finalResult = scoredSubcategories.map((item) => {
-      const key = `${item.category}||${item.subcategory}`;
+      const key = `${normalizeString(item.category)}||${normalizeString(item.subcategory)}`;
       const meta = subcategoryMetaMap[key] || {};
 
       return {
@@ -693,15 +675,18 @@ app.get("/trending_categories", async (req, res) => {
         subcategory: item.subcategory,
         bn: meta.bn || "",
         icon: meta.icon || "",
-        score: item.score,
+        score: item.score
       };
     });
 
     res.send(finalResult);
+
   } catch (error) {
+    console.error(error);
     res.status(500).send({ message: "Something went wrong" });
   }
 });
+
 
 
 app.get("/trending_stores", async (req, res) => {
@@ -710,11 +695,11 @@ app.get("/trending_stores", async (req, res) => {
 
   const product_collection = db.collection(db_collections.products);
   const clicked_products_collection = db.collection(
-    db_collections.clicked_products
+    db_collections.clicked_products,
   );
   const liked_products = db.collection(db_collections.liked_products);
   const commented_product_collection = db.collection(
-    db_collections.product_comments
+    db_collections.product_comments,
   );
 
   const now = new Date();
@@ -872,7 +857,7 @@ app.post("/like_product", async (req, res) => {
   if (find_user) {
     const final_result = await calculatePoints(
       pointCategoryObject.like,
-      userId
+      userId,
     );
     res.send(final_result);
   }
@@ -915,7 +900,7 @@ app.get("/pending_products", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const pending_product_collection = db.collection(
-    db_collections.pending_products
+    db_collections.pending_products,
   );
   const result = await pending_product_collection.find({}).toArray();
   res.send(result);
@@ -927,7 +912,7 @@ app.post("/upload_pending_product", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const pending_product_collection = db.collection(
-    db_collections.pending_products
+    db_collections.pending_products,
   );
 
   const { expired_at, ...dateLessProduct } = pending_product;
@@ -948,7 +933,7 @@ app.get("/single_pending_product/:id", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const pending_product_collection = db.collection(
-    db_collections.pending_products
+    db_collections.pending_products,
   );
 
   const result = await pending_product_collection.findOne({
@@ -961,15 +946,22 @@ app.patch("/update_pending_product/:id", async (req, res) => {
   const { id } = req.params;
   const product = req.body;
 
+  const { archive_at, ...dateLessProduct } = product;
+
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const pending_product_collection = db.collection(
-    db_collections.pending_products
+    db_collections.pending_products,
   );
+
+  const updated_product = {
+    ...dateLessProduct,
+    archive_at: new Date(archive_at),
+  };
 
   const result = await pending_product_collection.updateOne(
     { _id: new ObjectId(id) },
-    { $set: product }
+    { $set: updated_product },
   );
   res.send(result);
 });
@@ -1083,7 +1075,7 @@ app.post("/upload_category_subcategory", async (req, res) => {
     }
 
     const duplicateSub = category.subcategories.find(
-      (sub) => sub.en.toLowerCase() === en.toLowerCase()
+      (sub) => sub.en.toLowerCase() === en.toLowerCase(),
     );
 
     if (duplicateSub) {
@@ -1097,7 +1089,7 @@ app.post("/upload_category_subcategory", async (req, res) => {
 
     await category_collections.updateOne(
       { _id: category._id },
-      { $push: { subcategories: newSubcategory } }
+      { $push: { subcategories: newSubcategory } },
     );
 
     return res.send({
@@ -1155,7 +1147,7 @@ app.delete("/delete_subcategory/:id", async (req, res) => {
 
     const result = await category_collections.updateOne(
       { _id: new ObjectId(id) },
-      { $pull: { subcategories: { name: subCategoryName } } }
+      { $pull: { subcategories: { name: subCategoryName } } },
     );
 
     if (result.modifiedCount === 0) {
@@ -1222,8 +1214,8 @@ app.patch("/banner_sort", async (req, res) => {
     sort_type === "up"
       ? current.order - 1
       : sort_type === "down"
-      ? current.order + 1
-      : null;
+        ? current.order + 1
+        : null;
 
   if (targetOrder === null) {
     return res.send({ message: "Invalid sort type" });
@@ -1240,12 +1232,12 @@ app.patch("/banner_sort", async (req, res) => {
 
   await banner_collections.updateOne(
     { _id: swap_banner._id },
-    { $set: { order: current.order } }
+    { $set: { order: current.order } },
   );
 
   const result = await banner_collections.updateOne(
     { _id: current._id },
-    { $set: { order: targetOrder } }
+    { $set: { order: targetOrder } },
   );
 
   res.send(result);
@@ -1334,7 +1326,7 @@ app.put("/update_swiper_speed/:id", async (req, res) => {
 
   const result = await swiper_speed_collection.updateOne(
     { _id: new ObjectId(id) },
-    { $set: { time: time } }
+    { $set: { time: time } },
   );
 
   return res.send(result);
@@ -1360,7 +1352,7 @@ app.post("/verify_email/:email", async (req, res) => {
     const update_result = await users_collection.updateOne(
       { email: email, method: "email" },
       { $set: { reset_code: reset_code } },
-      { upsert: false }
+      { upsert: false },
     );
 
     if (update_result.acknowledged === true) {
@@ -1368,7 +1360,7 @@ app.post("/verify_email/:email", async (req, res) => {
       if (mail_result.accepted.length === 0) {
         await users_collection.updateOne(
           { email: email, method: "email" },
-          { $unset: { reset_code: "" } }
+          { $unset: { reset_code: "" } },
         );
         return res.send({
           success: false,
@@ -1434,7 +1426,7 @@ app.post("/reset_new_password", async (req, res) => {
       {
         $set: { password: hashedPassword },
         $unset: { reset_code: "" },
-      }
+      },
     );
     res.send(updateResult);
   }
@@ -1461,10 +1453,10 @@ app.get("/monthly_rising_stars", async (req, res) => {
   const users_collection = db.collection(db_collections.users);
   const product_collection = db.collection(db_collections.products);
   const clicked_products_collection = db.collection(
-    db_collections.clicked_products
+    db_collections.clicked_products,
   );
   const liked_products_collection = db.collection(
-    db_collections.liked_products
+    db_collections.liked_products,
   );
 
   const now = new Date();
@@ -1507,7 +1499,7 @@ app.get("/monthly_rising_stars", async (req, res) => {
     ([dealer_id, monthly_point]) => ({
       dealer_id,
       monthly_point,
-    })
+    }),
   );
 
   const sortedResult = result.sort((a, b) => b.monthly_point - a.monthly_point);
@@ -1540,7 +1532,7 @@ app.get("/heading_marquee_text", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const headingCollection = db.collection(
-    db_collections.heading_marquee_collection
+    db_collections.heading_marquee_collection,
   );
 
   const heading_marquee_text = await headingCollection.findOne({
@@ -1556,7 +1548,7 @@ app.put("/update_heading_marquee_text", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const headingCollection = db.collection(
-    db_collections.heading_marquee_collection
+    db_collections.heading_marquee_collection,
   );
 
   const updateDoc = {
@@ -1568,7 +1560,7 @@ app.put("/update_heading_marquee_text", async (req, res) => {
 
   const result = await headingCollection.updateOne(
     { _id: new ObjectId("69648510939043762034fa26") },
-    updateDoc
+    updateDoc,
   );
   res.send(result);
 });
