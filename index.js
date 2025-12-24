@@ -1262,14 +1262,14 @@ app.post("/reset_new_password", async (req, res) => {
   }
 });
 
-app.get("/operation",async(req,res) => {
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const products_collection = db.collection(db_collections.clicked_products);
-  const result = await products_collection
-    .deleteMany({ subcategory: { $exists: false } })
-  return res.send(result);
-});
+// app.get("/operation",async(req,res) => {
+//   const client = await dbConnect();
+//   const db = client.db(db_database.deal_bondhu_database);
+//   const products_collection = db.collection(db_collections.clicked_products);
+//   const result = await products_collection
+//     .deleteMany({ subcategory: { $exists: false } })
+//   return res.send(result);
+// });
 
 // using routes
 app.use("/users", users);
