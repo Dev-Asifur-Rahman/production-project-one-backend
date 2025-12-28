@@ -1565,6 +1565,10 @@ app.put("/update_heading_marquee_text", async (req, res) => {
   res.send(result);
 });
 
+app.post("/calculate_intent_score",async(req,res)=>{
+  res.send({success : true , message : 'triggered'})
+})
+
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
