@@ -1566,7 +1566,9 @@ app.put("/update_heading_marquee_text", async (req, res) => {
 });
 
 app.post("/calculate_intent_score",async(req,res)=>{
-  res.send({success : true , message : 'triggered'})
+  const body = req.body
+  const {session} = body
+  res.send({success : true , session})
 })
 
 // app.get("/operation", async (req, res) => {
