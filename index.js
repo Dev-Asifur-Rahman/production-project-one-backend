@@ -19,6 +19,10 @@ const {
 const archiveChecker = require("./middleware/archiveChecker.js");
 const archive_product_delete = require("./middleware/archiveProductDelete.js");
 const sendMail = require("./utils/sendEmail.js");
+const {
+  calculatePoints,
+  pointCategoryObject,
+} = require("./utils/calculatePoints.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -288,6 +292,7 @@ app.post("/approve_pending_product/:id", async (req, res) => {
   const pending_product_collection = db_db.collection(
     db_collections.pending_products
   );
+  const users_collection = db_db.collection(db_collections.users);
 
   const find_product = await pending_product_collection.findOne({
     _id: new ObjectId(id),
@@ -306,9 +311,22 @@ app.post("/approve_pending_product/:id", async (req, res) => {
     });
 
     const result = await product_collection.insertOne(product);
-    return res.send(result);
+
+    const find_user = await users_collection.findOne({
+      user_id: find_product?.user_id,
+    });
+
+    if (find_user) {
+      const final_result = await calculatePoints(
+        pointCategoryObject.post,
+        find_product?.user_id
+      );
+      if (final_result) {
+        return res.send({ acknowledged: true });
+      }
+    }
   } else {
-    return { success: false, message: "product not found" };
+    return res.send({ success: false, message: "product not found" });
   }
 });
 
@@ -388,13 +406,14 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
   return res.send(finalProducts);
 });
 
-
 app.post("/upload_click_products", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const clicked_products_collection = db.collection(
     db_collections.clicked_products
   );
+  const product_collection = db.collection(db_collections.products);
+  const users_collections = db.collection(db_collections.users);
 
   const clicked_object = req.body;
 
@@ -402,7 +421,22 @@ app.post("/upload_click_products", async (req, res) => {
     ...clicked_object,
     clicked_at: new Date(),
   });
-  res.send(result);
+
+  const id = clicked_object?.product_id;
+
+  const find_product = await product_collection.findOne({
+    _id: new ObjectId(id),
+  });
+  const userId = find_product?.user_id;
+
+  const find_user = await users_collections.findOne({ user_id: userId });
+  if (find_user) {
+    const final_result = await calculatePoints(
+      pointCategoryObject.click,
+      userId
+    );
+    res.send(final_result);
+  }
 });
 
 app.get("/popular_deals", async (req, res) => {
@@ -716,6 +750,8 @@ app.post("/like_product", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const liked_collection = db.collection(db_collections.liked_products);
+  const product_collection = db.collection(db_collections.products);
+  const users_collections = db.collection(db_collections.users);
 
   const { user_id, product_id } = req.body;
   const document_object = {
@@ -725,7 +761,20 @@ app.post("/like_product", async (req, res) => {
   };
 
   const result = await liked_collection.insertOne(document_object);
-  res.send(result);
+
+  const find_product = await product_collection.findOne({
+    _id: new ObjectId(product_id),
+  });
+  const userId = find_product?.user_id;
+
+  const find_user = await users_collections.findOne({ user_id: userId });
+  if (find_user) {
+    const final_result = await calculatePoints(
+      pointCategoryObject.like,
+      userId
+    );
+    res.send(final_result);
+  }
 });
 
 app.post("/unlike_product", async (req, res) => {
@@ -1262,19 +1311,33 @@ app.post("/reset_new_password", async (req, res) => {
   }
 });
 
-// app.get("/operation",async(req,res) => {
+// app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
-//   const products_collection = db.collection(db_collections.clicked_products);
-//   const result = await products_collection
-//     .deleteMany({ subcategory: { $exists: false } })
+//   const products_collection = db.collection(db_collections.users);
+//   const result = await products_collection.updateMany(
+//     {
+//       $or: [
+//         { points: { $exists: false } },
+//         { level: { $exists: false } },
+//         { badges_earned: { $exists: false } },
+//         { title: { $exists: false } },
+//       ],
+//     },
+//     {
+//       $set: {
+//         points: 0,
+//         level: "Bronze",
+//         badges_earned: ["Bronze"],
+//         title: "New Contributor",
+//       },
+//     }
+//   );
 //   return res.send(result);
 // });
 
 // using routes
 app.use("/users", users);
-
-
 
 app.listen(PORT, () => {
   console.log("app is running on port");
