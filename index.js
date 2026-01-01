@@ -1311,6 +1311,20 @@ app.post("/reset_new_password", async (req, res) => {
   }
 });
 
+app.get("/leaderboard", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const users_collection = db.collection(db_collections.users);
+
+  const leaderboard = await users_collection
+    .find({})
+    .sort({ points: -1 })
+    .limit(50)
+    .toArray();
+
+  res.send(leaderboard);
+});
+
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
