@@ -319,7 +319,7 @@ app.post("/approve_pending_product/:id", async (req, res) => {
     if (find_user) {
       const final_result = await calculatePoints(
         pointCategoryObject.post,
-        find_product?.user_id
+        find_product?.dealer_id
       );
       if (final_result) {
         return res.send({ acknowledged: true });
@@ -427,7 +427,7 @@ app.post("/upload_click_products", async (req, res) => {
   const find_product = await product_collection.findOne({
     _id: new ObjectId(id),
   });
-  const userId = find_product?.user_id;
+  const userId = find_product?.dealer_id;
 
   const find_user = await users_collections.findOne({ user_id: userId });
   if (find_user) {
@@ -753,19 +753,21 @@ app.post("/like_product", async (req, res) => {
   const product_collection = db.collection(db_collections.products);
   const users_collections = db.collection(db_collections.users);
 
-  const { user_id, product_id } = req.body;
+  const { user_id, product_id, category, subcategory, dealer_id } = req.body;
   const document_object = {
     user_id,
     product_id,
+    category,
+    subcategory,
+    dealer_id,
     liked_at: new Date(),
   };
-
   const result = await liked_collection.insertOne(document_object);
 
   const find_product = await product_collection.findOne({
     _id: new ObjectId(product_id),
   });
-  const userId = find_product?.user_id;
+  const userId = find_product?.dealer_id;
 
   const find_user = await users_collections.findOne({ user_id: userId });
   if (find_user) {
@@ -1325,25 +1327,97 @@ app.get("/leaderboard", async (req, res) => {
   res.send(leaderboard);
 });
 
+app.get("/monthly_rising_stars", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+
+  const users_collection = db.collection(db_collections.users);
+  const product_collection = db.collection(db_collections.products);
+  const clicked_products_collection = db.collection(
+    db_collections.clicked_products
+  );
+  const liked_products_collection = db.collection(
+    db_collections.liked_products
+  );
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const postPoints = await product_collection
+    .aggregate([
+      { $match: { created_at: { $gte: startOfMonth } } },
+      { $group: { _id: "$dealer_id", points: { $sum: 50 } } },
+    ])
+    .toArray();
+
+  const clickPoints = await clicked_products_collection
+    .aggregate([
+      { $match: { clicked_at: { $gte: startOfMonth } } },
+      { $group: { _id: "$dealer_id", points: { $sum: 5 } } },
+    ])
+    .toArray();
+
+  const likePoints = await liked_products_collection
+    .aggregate([
+      { $match: { liked_at: { $gte: startOfMonth } } },
+      { $group: { _id: "$dealer_id", points: { $sum: 10 } } },
+    ])
+    .toArray();
+
+  const monthlyMap = {};
+  const mergePoints = (arr) => {
+    arr.forEach((item) => {
+      if (!monthlyMap[item._id]) monthlyMap[item._id] = 0;
+      monthlyMap[item._id] += item.points;
+    });
+  };
+
+  mergePoints(postPoints);
+  mergePoints(clickPoints);
+  mergePoints(likePoints);
+
+  const result = Object.entries(monthlyMap).map(
+    ([dealer_id, monthly_point]) => ({
+      dealer_id,
+      monthly_point,
+    })
+  );
+
+  const sortedResult = result.sort((a, b) => b.monthly_point - a.monthly_point);
+
+  if (sortedResult.length > 0) {
+    const dealerIds = sortedResult.map((d) => d.dealer_id);
+    const usersData = await users_collection
+      .find({ user_id: { $in: dealerIds } })
+      .toArray();
+
+    const mappedResult = usersData.map((user) => {
+      const pointObj = sortedResult.find((r) => r.dealer_id === user.user_id);
+      return {
+        ...user,
+        monthly_point: pointObj?.monthly_point || 0,
+      };
+    });
+
+    const top20 = mappedResult
+      .sort((a, b) => b.monthly_point - a.monthly_point)
+      .slice(0, 20);
+
+    return res.send(top20);
+  } else {
+    return res.send([]);
+  }
+});
+
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
-//   const products_collection = db.collection(db_collections.users);
+//   const products_collection = db.collection(db_collections.liked_products);
 //   const result = await products_collection.updateMany(
-//     {
-//       $or: [
-//         { points: { $exists: false } },
-//         { level: { $exists: false } },
-//         { badges_earned: { $exists: false } },
-//         { title: { $exists: false } },
-//       ],
-//     },
+//     { dealer_id: { $exists: false } },
 //     {
 //       $set: {
-//         points: 0,
-//         level: "Bronze",
-//         badges_earned: ["Bronze"],
-//         title: "New Contributor",
+//         dealer_id: "44703a77-45ce-4478-948c-6d22a11dbf7e",
 //       },
 //     }
 //   );
