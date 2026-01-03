@@ -578,7 +578,9 @@ app.get("/trending_categories", async (req, res) => {
     const client = await dbConnect();
     const db = client.db(db_database.deal_bondhu_database);
 
-    const clicked_product_collection = db.collection(db_collections.clicked_products);
+    const clicked_product_collection = db.collection(
+      db_collections.clicked_products,
+    );
     const category_collection = db.collection(db_collections.categories);
 
     const today = new Date();
@@ -601,8 +603,8 @@ app.get("/trending_categories", async (req, res) => {
       .aggregate([
         {
           $match: {
-            clicked_at: { $gte: fourteenDaysAgo, $lte: today }
-          }
+            clicked_at: { $gte: fourteenDaysAgo, $lte: today },
+          },
         },
         {
           $project: {
@@ -610,17 +612,25 @@ app.get("/trending_categories", async (req, res) => {
             subcategory: 1,
             product_id: 1,
             week: {
-              $cond: [{ $gte: ["$clicked_at", sevenDaysAgo] }, "thisWeek", "lastWeek"]
-            }
-          }
+              $cond: [
+                { $gte: ["$clicked_at", sevenDaysAgo] },
+                "thisWeek",
+                "lastWeek",
+              ],
+            },
+          },
         },
         {
           $group: {
-            _id: { category: "$category", subcategory: "$subcategory", week: "$week" },
+            _id: {
+              category: "$category",
+              subcategory: "$subcategory",
+              week: "$week",
+            },
             totalClicks: { $sum: 1 },
-            products: { $addToSet: "$product_id" }
-          }
-        }
+            products: { $addToSet: "$product_id" },
+          },
+        },
       ])
       .toArray();
 
@@ -631,7 +641,13 @@ app.get("/trending_categories", async (req, res) => {
       const key = `${cat}||${subcat}`;
 
       if (!acc[key]) {
-        acc[key] = { category: cat, subcategory: subcat, thisWeek: 0, lastWeek: 0, productCount: 0 };
+        acc[key] = {
+          category: cat,
+          subcategory: subcat,
+          thisWeek: 0,
+          lastWeek: 0,
+          productCount: 0,
+        };
       }
 
       acc[key][week] = item.totalClicks;
@@ -641,10 +657,15 @@ app.get("/trending_categories", async (req, res) => {
     }, {});
 
     const scoredSubcategories = Object.values(subcategoryScores).map((data) => {
-      const avgClicksPerProduct = data.productCount > 0 ? data.thisWeek / data.productCount : 0;
+      const avgClicksPerProduct =
+        data.productCount > 0 ? data.thisWeek / data.productCount : 0;
       const growth = data.lastWeek ? data.thisWeek / data.lastWeek : 1;
 
-      return { category: data.category, subcategory: data.subcategory, score: avgClicksPerProduct * growth };
+      return {
+        category: data.category,
+        subcategory: data.subcategory,
+        score: avgClicksPerProduct * growth,
+      };
     });
 
     scoredSubcategories.sort((a, b) => b.score - a.score);
@@ -660,7 +681,7 @@ app.get("/trending_categories", async (req, res) => {
         const subKey = normalizeString(sub.en);
         subcategoryMetaMap[`${categoryKey}||${subKey}`] = {
           icon: sub.icon || "",
-          bn: sub.bn || ""
+          bn: sub.bn || "",
         };
       });
     });
@@ -675,19 +696,16 @@ app.get("/trending_categories", async (req, res) => {
         subcategory: item.subcategory,
         bn: meta.bn || "",
         icon: meta.icon || "",
-        score: item.score
+        score: item.score,
       };
     });
 
     res.send(finalResult);
-
   } catch (error) {
     console.error(error);
     res.status(500).send({ message: "Something went wrong" });
   }
 });
-
-
 
 app.get("/trending_stores", async (req, res) => {
   const client = await dbConnect();
@@ -1565,11 +1583,18 @@ app.put("/update_heading_marquee_text", async (req, res) => {
   res.send(result);
 });
 
-app.post("/calculate_intent_score",async(req,res)=>{
-  const body = req.body
-  const {session} = body
-  res.send({success : true , session})
-})
+app.post("/calculate_intent_score", async (req, res) => {
+  const body = req.body;
+  const { session } = body;
+
+  if (session === "entered") {
+    return res.send({ success: true, session });
+  } else if (session === "scrolled") {
+    return res.send({ success: true, session });
+  } else if (session === "leave") {
+    return res.send({ success: true, session });
+  }
+});
 
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
