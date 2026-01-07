@@ -1412,16 +1412,15 @@ app.get("/monthly_rising_stars", async (req, res) => {
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
-//   const products_collection = db.collection(db_collections.liked_products);
-//   const result = await products_collection.updateMany(
-//     { dealer_id: { $exists: false } },
-//     {
-//       $set: {
-//         dealer_id: "44703a77-45ce-4478-948c-6d22a11dbf7e",
-//       },
-//     }
-//   );
-//   return res.send(result);
+//   const products_collection = db.collection(db_collections.clicked_products);
+
+//   const result = await products_collection.deleteMany({
+//     $or: [{ subcategory: "" }, { subcategory: { $exists: false } }],
+//   });
+
+//   return res.send({
+//     deletedCount: result.deletedCount,
+//   });
 // });
 
 // using routes
