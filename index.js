@@ -442,9 +442,7 @@ app.post("/upload_click_products", async (req, res) => {
 app.get("/popular_deals", async (req, res) => {
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
-  const user_product_collection = db.collection(
-    db_collections.clicked_products
-  );
+  const clicked_products = db.collection(db_collections.clicked_products);
   const product_collection = db.collection(db_collections.products);
 
   const last_seven_date = new Date();
@@ -472,7 +470,7 @@ app.get("/popular_deals", async (req, res) => {
         weight: {
           $switch: {
             branches: [
-              { case: { $eq: ["$daysAgo", 0] }, then: 1.0 },
+              { case: { $eq: ["$daysAgo", 0] }, then: 1 },
               { case: { $eq: ["$daysAgo", 1] }, then: 0.9 },
               { case: { $in: ["$daysAgo", [2, 3]] }, then: 0.8 },
               { case: { $in: ["$daysAgo", [4, 5]] }, then: 0.7 },
@@ -494,24 +492,31 @@ app.get("/popular_deals", async (req, res) => {
       $sort: { popularityScore: -1 },
     },
     {
-      $limit: 10,
+      $limit: 7,
+    },
+    {
+    $addFields: { _id: { $toObjectId: "$_id" } }
+  },
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "product",
+      },
+    },
+    {
+      $unwind: "$product",
+    },
+    {
+      $replaceRoot: { newRoot: "$product" },
     },
   ];
 
-  const top_product_objects = await user_product_collection
+  const popular_products = await clicked_products
     .aggregate(popular_deals_pipeline)
     .toArray();
-
-  const product_ids = top_product_objects.map(
-    (object) => new ObjectId(object._id)
-  );
-
-  const top_products = await product_collection
-    .find({ _id: { $in: product_ids } })
-    .limit(7)
-    .toArray();
-
-  res.send(top_products);
+  res.send(popular_products);
 });
 
 app.get("/trending_categories", async (req, res) => {
