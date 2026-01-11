@@ -495,8 +495,8 @@ app.get("/popular_deals", async (req, res) => {
       $limit: 7,
     },
     {
-    $addFields: { _id: { $toObjectId: "$_id" } }
-  },
+      $addFields: { _id: { $toObjectId: "$_id" } },
+    },
     {
       $lookup: {
         from: "products",
@@ -929,88 +929,92 @@ app.delete("/delete_archive_product/:id", async (req, res) => {
 });
 
 app.post("/upload_category_subcategory", async (req, res) => {
-  const category = req.query.category;
-  const subcategory = req.query.subcategory;
+  const type = req.query.type;
+  const body = req.body;
 
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const category_collections = db.collection(db_collections.categories);
 
-  if (!category && !subcategory) {
-    return res.send({
-      success: false,
-      message: "Category or Subcategory is required",
-    });
+  if (!type) {
+    return res
+      .status(400)
+      .send({ success: false, message: "Type is required" });
   }
 
-  if (!category && subcategory) {
-    return res.send({
-      success: false,
-      message: "Category is required to add subcategory",
-    });
-  }
+  if (type === "category") {
+    const { name, bn, subcategories = [] } = body;
 
-  if (category && !subcategory) {
+    if (!name || !bn) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Category name and bn required" });
+    }
+
     const existingCategory = await category_collections.findOne({
-      name: { $regex: `^${category}$`, $options: "i" },
+      name: { $regex: `^${name}$`, $options: "i" },
     });
 
     if (existingCategory) {
-      return res.send({
-        success: false,
-        message: "Category already exists",
-      });
+      return res.send({ success: false, message: "Category already exists" });
     }
 
     await category_collections.insertOne({
-      name: category,
-      subcategories: [],
+      name,
+      bn,
+      subcategories,
     });
+
+    return res.send({ success: true, message: "Category added successfully" });
+  }
+
+  if (type === "subcategory") {
+    const { categoryName, name, en, bn, icon = "" } = body;
+
+    if (!categoryName || !name || !bn) {
+      return res
+        .status(400)
+        .send({
+          success: false,
+          message: "CategoryName, name, and bn are required",
+        });
+    }
+
+    const category = await category_collections.findOne({
+      name: { $regex: `^${categoryName}$`, $options: "i" },
+    });
+
+    if (!category) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Category not found" });
+    }
+
+    const duplicateSub = category.subcategories.find(
+      (sub) => sub.en.toLowerCase() === en.toLowerCase()
+    );
+
+    if (duplicateSub) {
+      return res.send({
+        success: false,
+        message: "Subcategory already exists",
+      });
+    }
+
+    const newSubcategory = { name, en, bn, icon };
+
+    await category_collections.updateOne(
+      { _id: category._id },
+      { $push: { subcategories: newSubcategory } }
+    );
 
     return res.send({
       success: true,
-      message: "Category added successfully",
+      message: "Subcategory added successfully",
     });
   }
 
-  if (category && subcategory) {
-    let existingCategory = await category_collections.findOne({
-      name: { $regex: `^${category}$`, $options: "i" },
-    });
-
-    if (existingCategory) {
-      const duplicateSub = existingCategory.subcategories.find(
-        (sub) => sub.toLowerCase() === subcategory.toLowerCase()
-      );
-
-      if (duplicateSub) {
-        return res.send({
-          success: false,
-          message: "Subcategory already exists in this category",
-        });
-      }
-
-      await category_collections.updateOne(
-        { _id: existingCategory._id },
-        { $push: { subcategories: subcategory } }
-      );
-
-      return res.send({
-        success: true,
-        message: "Subcategory added to existing category",
-      });
-    } else {
-      await category_collections.insertOne({
-        name: category,
-        subcategories: [subcategory],
-      });
-
-      return res.send({
-        success: true,
-        message: "Category and Subcategory created successfully",
-      });
-    }
-  }
+  return res.status(400).send({ success: false, message: "Invalid type" });
 });
 
 app.delete("/delete_category/:id", async (req, res) => {
@@ -1034,24 +1038,50 @@ app.delete("/delete_category/:id", async (req, res) => {
 
 app.delete("/delete_subcategory/:id", async (req, res) => {
   const { id } = req.params;
-  const subCategory = req.query.subcategory;
+  const subCategoryName = req.query.subcategory;
 
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const category_collections = db.collection(db_collections.categories);
-
-  const find_category = await category_collections.findOne({
-    _id: new ObjectId(id),
-  });
-  if (!find_category) {
-    return res.send({ success: false, message: "Product not Found" });
+  if (!subCategoryName) {
+    return res
+      .status(400)
+      .send({ success: false, message: "Subcategory name is required" });
   }
 
-  const result = await category_collections.updateOne(
-    { _id: new ObjectId(id) },
-    { $pull: { subcategory: subCategory } }
-  );
-  res.send(result);
+  try {
+    const client = await dbConnect();
+    const db = client.db(db_database.deal_bondhu_database);
+    const category_collections = db.collection(db_collections.categories);
+
+    const category = await category_collections.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!category) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Category not found" });
+    }
+
+    const result = await category_collections.updateOne(
+      { _id: new ObjectId(id) },
+      { $pull: { subcategories: { name: subCategoryName } } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .send({ success: false, message: "Subcategory not found" });
+    }
+
+    res.send({
+      success: true,
+      message: `Subcategory '${subCategoryName}' deleted successfully`,
+      acknowledged: true,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ success: false, message: "Server error", error: error.message });
+  }
 });
 
 app.get("/banners", async (req, res) => {
