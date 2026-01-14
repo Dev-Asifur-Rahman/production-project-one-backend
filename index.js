@@ -1589,7 +1589,8 @@ app.post("/calculate_intent_score", async (req, res) => {
 
   const client = await dbConnect()
   const db = client.db(db_database.deal_bondhu_database)
-
+  const intent_score_collection = db.collection(db_collections.intent_score)
+  
   if (session === "entered") {
     return res.send({ success: true, session });
   } else if (session === "scrolled") {
