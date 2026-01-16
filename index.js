@@ -1587,13 +1587,21 @@ app.post("/calculate_intent_score", async (req, res) => {
   const body = req.body;
   const { session } = body;
 
-  const client = await dbConnect()
-  const db = client.db(db_database.deal_bondhu_database)
-  const intent_score_collection = db.collection(db_collections.intent_score)
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const intent_score_collection = db.collection(db_collections.intent_score);
 
-  const find_intent_document = intent_score_collection.findOne({user_id, product_id})
+  const find_intent_document = intent_score_collection.findOne({
+    user_id,
+    product_id,
+  });
   if (session === "entered") {
-    return res.send({ success: true, session });
+    if (!find_intent_document) {
+      const create_intent_document = {};
+      return res.send({ success: true, session });
+    } else if (find_intent_document) {
+      return res.send({ success: true, session });
+    }
   } else if (session === "scrolled") {
     return res.send({ success: true, session });
   } else if (session === "leave") {
