@@ -1585,19 +1585,35 @@ app.put("/update_heading_marquee_text", async (req, res) => {
 
 app.post("/calculate_intent_score", async (req, res) => {
   const body = req.body;
-  const { session } = body;
-
+  const { session, product_id, user_id, dealer_id } = body;
+  console.log(session, product_id, user_id);
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const intent_score_collection = db.collection(db_collections.intent_score);
 
-  const find_intent_document = intent_score_collection.findOne({
+  const find_intent_document = await intent_score_collection.findOne({
     user_id,
     product_id,
   });
   if (session === "entered") {
     if (!find_intent_document) {
-      const create_intent_document = {};
+      const create_intent_document = {
+        user_id,
+        product_id,
+        dealer_id,
+        visited: 1,
+        firstVisited,
+        lastVisited,
+        lastLeft,
+        total_time_spent: 0,
+        city,
+        scrolled_fully: false,
+        devices: [],
+        intent_score: 0,
+        intent_level: "",
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
       return res.send({ success: true, session });
     } else if (find_intent_document) {
       return res.send({ success: true, session });
