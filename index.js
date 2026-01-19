@@ -1584,9 +1584,13 @@ app.put("/update_heading_marquee_text", async (req, res) => {
 });
 
 app.post("/calculate_intent_score", async (req, res) => {
+  const agent = user_agent.parse(req.headers["user-agent"]);
+
   const body = req.body;
   const { session, product_id, user_id, dealer_id } = body;
   console.log(session, product_id, user_id,dealer_id);
+  console.log(agent)
+  
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const intent_score_collection = db.collection(db_collections.intent_score);
