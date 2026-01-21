@@ -1587,6 +1587,17 @@ app.post("/calculate_intent_score", async (req, res) => {
   const agent = user_agent.parse(req.headers["user-agent"]);
   const browser = agent?.family || null;
 
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress ||
+    req.ip;
+
+  const lookup = await getLookUp();
+  const geo = lookup.get(ip) || {};
+  
+  console.log(ip)
+  console.log(geo)
+
   const body = req.body;
   const { session, product_id, user_id, dealer_id } = body;
 
@@ -1605,11 +1616,11 @@ app.post("/calculate_intent_score", async (req, res) => {
         product_id,
         dealer_id,
         visited: 1,
-        firstVisited : new Date(),
-        lastVisited : new Date(),
-        lastLeft : new Date(),
+        firstVisited: new Date(),
+        lastVisited: new Date(),
+        lastLeft: new Date(),
         total_time_spent: 0,
-        city : 'DHAKA',
+        city: "DHAKA",
         scrolled_fully: false,
         devices: [browser],
         intent_score: 0,
@@ -1617,7 +1628,7 @@ app.post("/calculate_intent_score", async (req, res) => {
         created_at: new Date(),
         updated_at: new Date(),
       };
-      console.log(create_intent_document)
+      console.log(create_intent_document);
       return res.send({ success: true, session });
     } else if (find_intent_document) {
       return res.send({ success: true, session });
