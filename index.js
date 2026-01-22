@@ -23,6 +23,10 @@ const {
   calculatePoints,
   pointCategoryObject,
 } = require("./utils/calculatePoints.js");
+const {
+  deviceType,
+  scoreCalculator,
+} = require("./utils/intentScoreCalculator.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1585,7 +1589,8 @@ app.put("/update_heading_marquee_text", async (req, res) => {
 
 app.post("/calculate_intent_score", async (req, res) => {
   const agent = user_agent.parse(req.headers["user-agent"]);
-  const browser = agent?.family || null;
+  const os = agent?.os?.family.toLocaleLowerCase() || null;
+  const device = deviceType(os);
 
   const ip =
     req.headers["x-forwarded-for"]?.split(",")[0] ||
@@ -1594,12 +1599,17 @@ app.post("/calculate_intent_score", async (req, res) => {
 
   const lookup = await getLookUp();
   const geo = lookup.get(ip) || {};
-  
-  console.log(ip)
-  console.log(geo)
 
   const body = req.body;
-  const { session, product_id, user_id, dealer_id } = body;
+  const {
+    session,
+    product_id,
+    user_id,
+    dealer_id,
+    company,
+    category,
+    subcategory,
+  } = body;
 
   const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
@@ -1609,33 +1619,128 @@ app.post("/calculate_intent_score", async (req, res) => {
     user_id,
     product_id,
   });
+
+  const time_zone = geo?.location?.time_zone;
+  const city = time_zone.split("/")[1] || null;
+
+  const intent_score_object = scoreCalculator();
+  let { score, level } = intent_score_object;
+
+  if (device === "desktop") score += 10;
+
+  const hour = new Date().getHours();
+  if (hour >= 18 && hour <= 22) score += 5;
+
+  if (["Dhaka", "Chittagong"].includes(city)) score += 5;
+
+  if (score >= 70) level = "high";
+  else if (score >= 40) level = "medium";
+
   if (session === "entered") {
     if (!find_intent_document) {
       const create_intent_document = {
         user_id,
         product_id,
         dealer_id,
+        company,
+        category,
+        subcategory,
         visited: 1,
         firstVisited: new Date(),
         lastVisited: new Date(),
-        lastLeft: new Date(),
+        lastLeft: null,
         total_time_spent: 0,
-        city: "DHAKA",
+        city: city,
         scrolled_fully: false,
-        devices: [browser],
-        intent_score: 0,
-        intent_level: "",
+        device: device,
+        intent_score: score,
+        intent_level: level,
         created_at: new Date(),
         updated_at: new Date(),
       };
-      console.log(create_intent_document);
-      return res.send({ success: true, session });
+      const result = await intent_score_collection.insertOne(
+        create_intent_document,
+      );
+      return res.send({ success: true, result });
     } else if (find_intent_document) {
+      const { visited } = find_intent_document;
+      const updatedScoreObject = scoreCalculator();
+      let { score: updatedScore, level: updatedLevel } = updatedScoreObject;
+
+      if (device === "desktop") updatedScore += 10;
+
+      const hour = new Date().getHours();
+      if (hour >= 18 && hour <= 22) updatedScore += 5;
+
+      if (["Dhaka", "Chittagong"].includes(city)) updatedScore += 5;
+
+      if (visited >= 2) updatedScore += 20;
+
+      if (updatedScore >= 70) updatedLevel = "high";
+      else if (updatedScore >= 40) updatedLevel = "medium";
+
+      await intent_score_collection.updateOne(
+        { user_id, product_id },
+        {
+          $set: {
+            lastVisited: new Date(),
+            city,
+            device,
+            intent_score: updatedScore,
+            intent_level: updatedLevel,
+            updated_at: new Date(),
+          },
+          $inc: { visited: 1 },
+        },
+      );
+
       return res.send({ success: true, session });
     }
   } else if (session === "scrolled") {
-    return res.send({ success: true, session });
+    let { intent_score: currentScore, intent_level: currentLevel } =
+      find_intent_document;
+    currentScore += 25;
+
+    if (currentScore >= 70) currentLevel = "high";
+    else if (currentScore >= 40) currentLevel = "medium";
+
+    await intent_score_collection.updateOne(
+      { user_id, product_id },
+      {
+        $set: {
+          scrolled_fully: true,
+          intent_score: currentScore,
+          intent_level: currentLevel,
+          updated_at: new Date(),
+        },
+      },
+    );
   } else if (session === "leave") {
+    const leaveTime = new Date();
+    const timeSpent = (leaveTime - find_intent_document.lastVisited) / 1000;
+
+    let updatedScore = find_intent_document.intent_score;
+
+    if (timeSpent < 10) updatedScore -= 20;
+    else if (timeSpent >= 30) updatedScore += 20;
+
+    let updatedLevel = "low";
+    if (updatedScore >= 70) updatedLevel = "high";
+    else if (updatedScore >= 40) updatedLevel = "medium";
+
+    await intent_score_collection.updateOne(
+      { user_id, product_id },
+      {
+        $set: {
+          lastLeft: leaveTime,
+          total_time_spent: find_intent_document.total_time_spent + timeSpent,
+          intent_score: updatedScore,
+          intent_level: updatedLevel,
+          updated_at: new Date(),
+        },
+      },
+    );
+
     return res.send({ success: true, session });
   }
 });
