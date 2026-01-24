@@ -26,6 +26,12 @@ const {
 const {
   deviceType,
   scoreCalculator,
+  userVisited,
+  deviceScore,
+  timeScore,
+  locationScore,
+  intentLevelCalculator,
+  spentTimeScore,
 } = require("./utils/intentScoreCalculator.js");
 
 const app = express();
@@ -1623,21 +1629,35 @@ app.post("/calculate_intent_score", async (req, res) => {
   const time_zone = geo?.location?.time_zone;
   const city = time_zone.split("/")[1] || null;
 
-  const intent_score_object = scoreCalculator();
-  let { score, level } = intent_score_object;
-
-  if (device === "desktop") score += 10;
-
-  const hour = new Date().getHours();
-  if (hour >= 18 && hour <= 22) score += 5;
-
-  if (["Dhaka", "Chittagong"].includes(city)) score += 5;
-
-  if (score >= 70) level = "high";
-  else if (score >= 40) level = "medium";
+  let score = 0;
 
   if (session === "entered") {
     if (!find_intent_document) {
+      let intentHourBoolean = false;
+      const hour = new Date().getHours();
+      if (hour >= 18 && hour <= 22) {
+        intentHourBoolean = true;
+      }
+
+      const previousData = {
+        device: device === "mobile" ? false : true,
+        visit_time: intentHourBoolean,
+        location: ["Dhaka", "Chittagong"].includes(city) ? true : false,
+        time_spent: false,
+      };
+
+      score += userVisited(false);
+      const { deviceUpdatedScore } = deviceScore(device, score, previousData);
+      const { timeUpdatedScore } = timeScore(deviceUpdatedScore, previousData);
+      const { updateLocationScore } = locationScore(
+        city,
+        timeUpdatedScore,
+        previousData,
+      );
+
+      const finalScore = updateLocationScore;
+      const intent_level = intentLevelCalculator(finalScore);
+
       const create_intent_document = {
         user_id,
         product_id,
@@ -1653,10 +1673,11 @@ app.post("/calculate_intent_score", async (req, res) => {
         city: city,
         scrolled_fully: false,
         device: device,
-        intent_score: score,
-        intent_level: level,
+        intent_score: finalScore,
+        intent_level: intent_level,
         created_at: new Date(),
         updated_at: new Date(),
+        previousData,
       };
       const result = await intent_score_collection.insertOne(
         create_intent_document,
@@ -1664,20 +1685,30 @@ app.post("/calculate_intent_score", async (req, res) => {
       return res.send({ success: true, result });
     } else if (find_intent_document) {
       const { visited } = find_intent_document;
-      const updatedScoreObject = scoreCalculator();
-      let { score: updatedScore, level: updatedLevel } = updatedScoreObject;
+      
+      let {intent_score:updatedScore,previousData} = find_intent_document
 
-      if (device === "desktop") updatedScore += 10;
+      const { deviceUpdatedScore, device: modified_device } = deviceScore(
+        device,
+        updatedScore,
+        previousData,
+      );
 
-      const hour = new Date().getHours();
-      if (hour >= 18 && hour <= 22) updatedScore += 5;
+      let { location: modified_location, updateLocationScore } = locationScore(
+        city,
+        deviceUpdatedScore,
+        previousData,
+      );
 
-      if (["Dhaka", "Chittagong"].includes(city)) updatedScore += 5;
+      if (visited + 1 === 3) updateLocationScore += 10;
 
-      if (visited >= 2) updatedScore += 20;
+      let { timeUpdatedScore, visit_time: modified_visit_time } = timeScore(
+        updateLocationScore,
+        previousData,
+      );
 
-      if (updatedScore >= 70) updatedLevel = "high";
-      else if (updatedScore >= 40) updatedLevel = "medium";
+      const finalScore = timeUpdatedScore;
+      const intent_level = intentLevelCalculator(finalScore);
 
       await intent_score_collection.updateOne(
         { user_id, product_id },
@@ -1686,9 +1717,15 @@ app.post("/calculate_intent_score", async (req, res) => {
             lastVisited: new Date(),
             city,
             device,
-            intent_score: updatedScore,
-            intent_level: updatedLevel,
+            intent_score: finalScore,
+            intent_level: intent_level,
             updated_at: new Date(),
+            previousData: {
+              device: modified_device,
+              location: modified_location,
+              visit_time: modified_visit_time,
+              time_spent: previousData.time_spent,
+            },
           },
           $inc: { visited: 1 },
         },
@@ -1699,10 +1736,9 @@ app.post("/calculate_intent_score", async (req, res) => {
   } else if (session === "scrolled") {
     let { intent_score: currentScore, intent_level: currentLevel } =
       find_intent_document;
-    currentScore += 25;
+    currentScore += 10;
 
-    if (currentScore >= 70) currentLevel = "high";
-    else if (currentScore >= 40) currentLevel = "medium";
+    const intent_level = intentLevelCalculator(currentScore);
 
     await intent_score_collection.updateOne(
       { user_id, product_id },
@@ -1710,23 +1746,24 @@ app.post("/calculate_intent_score", async (req, res) => {
         $set: {
           scrolled_fully: true,
           intent_score: currentScore,
-          intent_level: currentLevel,
+          intent_level: intent_level,
           updated_at: new Date(),
         },
       },
     );
   } else if (session === "leave") {
-    const leaveTime = new Date();
-    const timeSpent = (leaveTime - find_intent_document.lastVisited) / 1000;
+    const { intent_score, lastVisited, previousData } = find_intent_document;
 
-    let updatedScore = find_intent_document.intent_score;
+    let updatedScore = intent_score;
 
-    if (timeSpent < 10) updatedScore -= 20;
-    else if (timeSpent >= 30) updatedScore += 20;
+    let {
+      leaveTime,
+      timeSpent,
+      time_spent: modified_time_spent,
+      updatedTimeScore,
+    } = spentTimeScore(lastVisited, updatedScore, previousData);
 
-    let updatedLevel = "low";
-    if (updatedScore >= 70) updatedLevel = "high";
-    else if (updatedScore >= 40) updatedLevel = "medium";
+    const intent_level = intentLevelCalculator(updatedTimeScore);
 
     await intent_score_collection.updateOne(
       { user_id, product_id },
@@ -1734,9 +1771,15 @@ app.post("/calculate_intent_score", async (req, res) => {
         $set: {
           lastLeft: leaveTime,
           total_time_spent: find_intent_document.total_time_spent + timeSpent,
-          intent_score: updatedScore,
-          intent_level: updatedLevel,
+          intent_score: updatedTimeScore,
+          intent_level: intent_level,
           updated_at: new Date(),
+          previousData: {
+            device: previousData.device,
+            location: previousData.location,
+            visit_time: previousData.visit_time,
+            time_spent: modified_time_spent,
+          },
         },
       },
     );
@@ -1752,11 +1795,13 @@ app.get("/revenue", async (req, res) => {
     const intent_score_collection = db.collection(db_collections.intent_score);
     const product_collection = db.collection(db_collections.products);
 
-    const pipeline = [      {
+    const pipeline = [
+      {
         $addFields: {
           product_obj_id: { $toObjectId: "$product_id" },
         },
       },
+
       {
         $lookup: {
           from: db_collections.products,
@@ -1765,38 +1810,63 @@ app.get("/revenue", async (req, res) => {
           as: "product_info",
         },
       },
+
       { $unwind: "$product_info" },
+
       {
         $group: {
           _id: "$product_id",
+
+          title: { $first: "$product_info.title" },
+          product_image: { $first: "$product_info.product_image" },
+
           company: { $first: "$product_info.company" },
           category: { $first: "$product_info.category" },
           subcategory: { $first: "$product_info.subcategory" },
           dealer_id: { $first: "$product_info.dealer_id" },
-          offer_price: { $first: { $toDouble: "$product_info.offer_price" } },
+
+          offer_price: {
+            $first: { $toDouble: "$product_info.offer_price" },
+          },
 
           total_users: { $sum: 1 },
 
           high_intent_users: {
             $sum: { $cond: [{ $eq: ["$intent_level", "high"] }, 1, 0] },
           },
+
           medium_intent_users: {
             $sum: { $cond: [{ $eq: ["$intent_level", "medium"] }, 1, 0] },
           },
+
           low_intent_users: {
             $sum: { $cond: [{ $eq: ["$intent_level", "low"] }, 1, 0] },
           },
         },
       },
+
       {
         $addFields: {
+          intent_breakdown: {
+            high: "$high_intent_users",
+            medium: "$medium_intent_users",
+            low: "$low_intent_users",
+          },
+
           estimated_purchases: {
-            high: { $round: [{ $multiply: ["$high_intent_users", 0.08] }, 0] },
-            medium: { $round: [{ $multiply: ["$medium_intent_users", 0.04] }, 0] },
-            low: { $round: [{ $multiply: ["$low_intent_users", 0.01] }, 0] },
+            high: {
+              $round: [{ $multiply: ["$high_intent_users", 0.08] }, 0],
+            },
+            medium: {
+              $round: [{ $multiply: ["$medium_intent_users", 0.04] }, 0],
+            },
+            low: {
+              $round: [{ $multiply: ["$low_intent_users", 0.01] }, 0],
+            },
           },
         },
       },
+
       {
         $addFields: {
           estimated_purchases_total: {
@@ -1808,6 +1878,7 @@ app.get("/revenue", async (req, res) => {
           },
         },
       },
+
       {
         $addFields: {
           revenue_estimate: {
@@ -1816,10 +1887,19 @@ app.get("/revenue", async (req, res) => {
               $multiply: ["$estimated_purchases_total", "$offer_price"],
             },
           },
+
           created_at: new Date(),
         },
       },
-      // optional: sort by total revenue descending
+
+      {
+        $project: {
+          high_intent_users: 0,
+          medium_intent_users: 0,
+          low_intent_users: 0,
+        },
+      },
+
       { $sort: { "revenue_estimate.total_bdt": -1 } },
     ];
 
@@ -1830,7 +1910,6 @@ app.get("/revenue", async (req, res) => {
     return res.status(500).send({ success: false, error: error.message });
   }
 });
-
 
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
