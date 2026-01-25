@@ -120,7 +120,7 @@ const intentLevelCalculator = (score) => {
   if (score >= 70) {
     level = "medium";
   }
-  if (score > 80) {
+  if (score >= 80) {
     level = "high";
   }
   return level

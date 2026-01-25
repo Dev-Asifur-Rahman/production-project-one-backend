@@ -1644,6 +1644,7 @@ app.post("/calculate_intent_score", async (req, res) => {
         visit_time: intentHourBoolean,
         location: ["Dhaka", "Chittagong"].includes(city) ? true : false,
         time_spent: false,
+        site_visited: false,
       };
 
       score += userVisited(false);
@@ -1723,6 +1724,7 @@ app.post("/calculate_intent_score", async (req, res) => {
               location: modified_location,
               visit_time: modified_visit_time,
               time_spent: previousData.time_spent,
+              site_visited: previousData.site_visited,
             },
           },
           $inc: { visited: 1 },
@@ -1746,6 +1748,31 @@ app.post("/calculate_intent_score", async (req, res) => {
           intent_score: currentScore,
           intent_level: intent_level,
           updated_at: new Date(),
+        },
+      },
+    );
+  } else if (session === "visited") {
+    let { intent_score: currentScore, previousData } = find_intent_document;
+    const { site_visited } = previousData;
+    if (!site_visited) {
+      currentScore += 10;
+    }
+    const finalScore = currentScore;
+    const intent_level = intentLevelCalculator(finalScore);
+    await intent_score_collection.updateOne(
+      { user_id, product_id },
+      {
+        $set: {
+          intent_score: finalScore,
+          intent_level: intent_level,
+          updated_at: new Date(),
+          previousData: {
+            device: previousData.device,
+            location: previousData.location,
+            visit_time: previousData.visit_time,
+            time_spent: previousData.time_spent,
+            site_visited: true,
+          },
         },
       },
     );
