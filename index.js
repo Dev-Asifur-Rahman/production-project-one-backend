@@ -1647,15 +1647,13 @@ app.post("/calculate_intent_score", async (req, res) => {
       };
 
       score += userVisited(false);
-      const { deviceUpdatedScore } = deviceScore(device, score, previousData);
-      const { timeUpdatedScore } = timeScore(deviceUpdatedScore, previousData);
-      const { updateLocationScore } = locationScore(
-        city,
-        timeUpdatedScore,
-        previousData,
-      );
 
-      const finalScore = updateLocationScore;
+      // add for location and device by default
+      device === "desktop" && (score += 5);
+      intentHourBoolean && (score += 10);
+      ["Dhaka", "Chittagong"].includes(city) && (score += 5);
+
+      const finalScore = score;
       const intent_level = intentLevelCalculator(finalScore);
 
       const create_intent_document = {
@@ -1685,8 +1683,8 @@ app.post("/calculate_intent_score", async (req, res) => {
       return res.send({ success: true, result });
     } else if (find_intent_document) {
       const { visited } = find_intent_document;
-      
-      let {intent_score:updatedScore,previousData} = find_intent_document
+
+      let { intent_score: updatedScore, previousData } = find_intent_document;
 
       const { deviceUpdatedScore, device: modified_device } = deviceScore(
         device,
