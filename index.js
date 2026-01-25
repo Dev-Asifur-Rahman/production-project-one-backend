@@ -1818,42 +1818,15 @@ app.get("/revenue", async (req, res) => {
   try {
     const client = await dbConnect();
     const db = client.db(db_database.deal_bondhu_database);
-    const intent_score_collection = db.collection(db_collections.intent_score);
-    const product_collection = db.collection(db_collections.products);
+
+    const intent_score_collection = db.collection(
+      db_collections.intent_score
+    );
 
     const pipeline = [
       {
-        $addFields: {
-          product_obj_id: { $toObjectId: "$product_id" },
-        },
-      },
-
-      {
-        $lookup: {
-          from: db_collections.products,
-          localField: "product_obj_id",
-          foreignField: "_id",
-          as: "product_info",
-        },
-      },
-
-      { $unwind: "$product_info" },
-
-      {
         $group: {
           _id: "$product_id",
-
-          title: { $first: "$product_info.title" },
-          product_image: { $first: "$product_info.product_image" },
-
-          company: { $first: "$product_info.company" },
-          category: { $first: "$product_info.category" },
-          subcategory: { $first: "$product_info.subcategory" },
-          dealer_id: { $first: "$product_info.dealer_id" },
-
-          offer_price: {
-            $first: { $toDouble: "$product_info.offer_price" },
-          },
 
           total_users: { $sum: 1 },
 
@@ -1873,12 +1846,47 @@ app.get("/revenue", async (req, res) => {
 
       {
         $addFields: {
+          product_obj_id: { $toObjectId: "$_id" },
+        },
+      },
+
+      {
+        $lookup: {
+          from: db_collections.products,
+          localField: "product_obj_id",
+          foreignField: "_id",
+          as: "product_info",
+        },
+      },
+
+      { $unwind: "$product_info" },
+
+      {
+        $addFields: {
+          title: "$product_info.title",
+          product_image: "$product_info.product_image",
+          company: "$product_info.company",
+          category: "$product_info.category",
+          subcategory: "$product_info.subcategory",
+          dealer_id: "$product_info.dealer_id",
+          offer_price: {
+            $toDouble: "$product_info.offer_price",
+          },
+        },
+      },
+
+      {
+        $addFields: {
           intent_breakdown: {
             high: "$high_intent_users",
             medium: "$medium_intent_users",
             low: "$low_intent_users",
           },
+        },
+      },
 
+      {
+        $addFields: {
           estimated_purchases: {
             high: {
               $round: [{ $multiply: ["$high_intent_users", 0.08] }, 0],
@@ -1920,6 +1928,8 @@ app.get("/revenue", async (req, res) => {
 
       {
         $project: {
+          product_info: 0,
+          product_obj_id: 0,
           high_intent_users: 0,
           medium_intent_users: 0,
           low_intent_users: 0,
@@ -1929,13 +1939,25 @@ app.get("/revenue", async (req, res) => {
       { $sort: { "revenue_estimate.total_bdt": -1 } },
     ];
 
-    const result = await intent_score_collection.aggregate(pipeline).toArray();
-    return res.send({ success: true, data: result });
+    const result = await intent_score_collection
+      .aggregate(pipeline)
+      .toArray();
+
+    return res.send({
+      success: true,
+      count: result.length,
+      data: result,
+    });
   } catch (error) {
-    console.error(error);
-    return res.status(500).send({ success: false, error: error.message });
+    console.error("Revenue API Error:", error);
+
+    return res.status(500).send({
+      success: false,
+      error: error.message,
+    });
   }
 });
+
 
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
