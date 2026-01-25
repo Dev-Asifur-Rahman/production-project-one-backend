@@ -1823,16 +1823,16 @@ app.get("/revenue", async (req, res) => {
     const pipeline = [
       {
         $addFields: {
-          product_obj_id: { $toObjectId: "$product_id" },
-        },
+          product_obj_id: { $toObjectId: "$product_id" }
+        }
       },
       {
         $lookup: {
           from: db_collections.products,
           localField: "product_obj_id",
           foreignField: "_id",
-          as: "product_info",
-        },
+          as: "product_info"
+        }
       },
       { $unwind: "$product_info" },
       {
@@ -1848,47 +1848,51 @@ app.get("/revenue", async (req, res) => {
           total_users: { $sum: 1 },
           high_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "high"] }, 1, 0] } },
           medium_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "medium"] }, 1, 0] } },
-          low_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "low"] }, 1, 0] } },
-        },
+          low_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "low"] }, 1, 0] } }
+        }
       },
       {
         $addFields: {
           intent_breakdown: {
             high: "$high_intent_users",
             medium: "$medium_intent_users",
-            low: "$low_intent_users",
+            low: "$low_intent_users"
           },
           estimated_purchases: {
             high: { $multiply: ["$high_intent_users", 0.08] },
             medium: { $multiply: ["$medium_intent_users", 0.04] },
-            low: { $multiply: ["$low_intent_users", 0.01] },
-          },
-        },
+            low: { $multiply: ["$low_intent_users", 0.01] }
+          }
+        }
       },
       {
         $addFields: {
           estimated_purchases_total: {
-            $add: ["$estimated_purchases.high", "$estimated_purchases.medium", "$estimated_purchases.low"],
-          },
-        },
+            $add: [
+              "$estimated_purchases.high",
+              "$estimated_purchases.medium",
+              "$estimated_purchases.low"
+            ]
+          }
+        }
       },
       {
         $addFields: {
           revenue_estimate: {
             avg_price: "$offer_price",
-            total_bdt: { $multiply: ["$estimated_purchases_total", "$offer_price"] },
+            total_bdt: { $round: [{ $multiply: ["$estimated_purchases_total", "$offer_price"] }, 0] }
           },
-          created_at: new Date(),
-        },
+          created_at: new Date()
+        }
       },
       {
         $project: {
           high_intent_users: 0,
           medium_intent_users: 0,
-          low_intent_users: 0,
-        },
+          low_intent_users: 0
+        }
       },
-      { $sort: { "revenue_estimate.total_bdt": -1 } },
+      { $sort: { "revenue_estimate.total_bdt": -1 } }
     ];
 
     const result = await intent_score_collection.aggregate(pipeline).toArray();
@@ -1898,6 +1902,7 @@ app.get("/revenue", async (req, res) => {
     return res.status(500).send({ success: false, error: error.message });
   }
 });
+
 
 
 
