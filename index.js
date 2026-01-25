@@ -1756,14 +1756,12 @@ app.post("/calculate_intent_score", async (req, res) => {
     const { site_visited } = previousData;
     if (!site_visited) {
       currentScore += 10;
-    }
-    const finalScore = currentScore;
-    const intent_level = intentLevelCalculator(finalScore);
+      const intent_level = intentLevelCalculator(currentScore);
     await intent_score_collection.updateOne(
       { user_id, product_id },
       {
         $set: {
-          intent_score: finalScore,
+          intent_score: currentScore,
           intent_level: intent_level,
           updated_at: new Date(),
           previousData: {
@@ -1776,6 +1774,8 @@ app.post("/calculate_intent_score", async (req, res) => {
         },
       },
     );
+    }
+    
   } else if (session === "leave") {
     const { intent_score, lastVisited, previousData } = find_intent_document;
 
@@ -1804,6 +1804,7 @@ app.post("/calculate_intent_score", async (req, res) => {
             location: previousData.location,
             visit_time: previousData.visit_time,
             time_spent: modified_time_spent,
+            site_visited : previousData.site_visited
           },
         },
       },
