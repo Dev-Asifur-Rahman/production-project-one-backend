@@ -1757,25 +1757,24 @@ app.post("/calculate_intent_score", async (req, res) => {
     if (!site_visited) {
       currentScore += 10;
       const intent_level = intentLevelCalculator(currentScore);
-    await intent_score_collection.updateOne(
-      { user_id, product_id },
-      {
-        $set: {
-          intent_score: currentScore,
-          intent_level: intent_level,
-          updated_at: new Date(),
-          previousData: {
-            device: previousData.device,
-            location: previousData.location,
-            visit_time: previousData.visit_time,
-            time_spent: previousData.time_spent,
-            site_visited: true,
+      await intent_score_collection.updateOne(
+        { user_id, product_id },
+        {
+          $set: {
+            intent_score: currentScore,
+            intent_level: intent_level,
+            updated_at: new Date(),
+            previousData: {
+              device: previousData.device,
+              location: previousData.location,
+              visit_time: previousData.visit_time,
+              time_spent: previousData.time_spent,
+              site_visited: true,
+            },
           },
         },
-      },
-    );
+      );
     }
-    
   } else if (session === "leave") {
     const { intent_score, lastVisited, previousData } = find_intent_document;
 
@@ -1804,7 +1803,7 @@ app.post("/calculate_intent_score", async (req, res) => {
             location: previousData.location,
             visit_time: previousData.visit_time,
             time_spent: modified_time_spent,
-            site_visited : previousData.site_visited
+            site_visited: previousData.site_visited,
           },
         },
       },
@@ -1823,16 +1822,16 @@ app.get("/revenue", async (req, res) => {
     const pipeline = [
       {
         $addFields: {
-          product_obj_id: { $toObjectId: "$product_id" }
-        }
+          product_obj_id: { $toObjectId: "$product_id" },
+        },
       },
       {
         $lookup: {
           from: db_collections.products,
           localField: "product_obj_id",
           foreignField: "_id",
-          as: "product_info"
-        }
+          as: "product_info",
+        },
       },
       { $unwind: "$product_info" },
       {
@@ -1846,24 +1845,30 @@ app.get("/revenue", async (req, res) => {
           dealer_id: { $first: "$product_info.dealer_id" },
           offer_price: { $first: { $toDouble: "$product_info.offer_price" } },
           total_users: { $sum: 1 },
-          high_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "high"] }, 1, 0] } },
-          medium_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "medium"] }, 1, 0] } },
-          low_intent_users: { $sum: { $cond: [{ $eq: ["$intent_level", "low"] }, 1, 0] } }
-        }
+          high_intent_users: {
+            $sum: { $cond: [{ $eq: ["$intent_level", "high"] }, 1, 0] },
+          },
+          medium_intent_users: {
+            $sum: { $cond: [{ $eq: ["$intent_level", "medium"] }, 1, 0] },
+          },
+          low_intent_users: {
+            $sum: { $cond: [{ $eq: ["$intent_level", "low"] }, 1, 0] },
+          },
+        },
       },
       {
         $addFields: {
           intent_breakdown: {
             high: "$high_intent_users",
             medium: "$medium_intent_users",
-            low: "$low_intent_users"
+            low: "$low_intent_users",
           },
           estimated_purchases: {
             high: { $multiply: ["$high_intent_users", 0.08] },
             medium: { $multiply: ["$medium_intent_users", 0.04] },
-            low: { $multiply: ["$low_intent_users", 0.01] }
-          }
-        }
+            low: { $multiply: ["$low_intent_users", 0.01] },
+          },
+        },
       },
       {
         $addFields: {
@@ -1871,28 +1876,33 @@ app.get("/revenue", async (req, res) => {
             $add: [
               "$estimated_purchases.high",
               "$estimated_purchases.medium",
-              "$estimated_purchases.low"
-            ]
-          }
-        }
+              "$estimated_purchases.low",
+            ],
+          },
+        },
       },
       {
         $addFields: {
           revenue_estimate: {
             avg_price: "$offer_price",
-            total_bdt: { $round: [{ $multiply: ["$estimated_purchases_total", "$offer_price"] }, 0] }
+            total_bdt: {
+              $round: [
+                { $multiply: ["$estimated_purchases_total", "$offer_price"] },
+                0,
+              ],
+            },
           },
-          created_at: new Date()
-        }
+          created_at: new Date(),
+        },
       },
       {
         $project: {
           high_intent_users: 0,
           medium_intent_users: 0,
-          low_intent_users: 0
-        }
+          low_intent_users: 0,
+        },
       },
-      { $sort: { "revenue_estimate.total_bdt": -1 } }
+      { $sort: { "revenue_estimate.total_bdt": -1 } },
     ];
 
     const result = await intent_score_collection.aggregate(pipeline).toArray();
@@ -1903,8 +1913,24 @@ app.get("/revenue", async (req, res) => {
   }
 });
 
+app.get("/search/:keyword", async (req, res) => {
+  const client = dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const products_collection = db.collection(db_collections.products);
 
+  const keyword = decodeURIComponent(req.params.keyword);
 
+  const result = await products_collection
+    .find({
+      title: {
+        $regex: keyword,
+        $options: "i",
+      },
+    })
+    .toArray();
+
+  res.send(result);
+});
 
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
