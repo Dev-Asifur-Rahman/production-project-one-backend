@@ -1914,7 +1914,7 @@ app.get("/revenue", async (req, res) => {
 });
 
 app.get("/search/:keyword", async (req, res) => {
-  const client = dbConnect();
+  const client = await dbConnect();
   const db = client.db(db_database.deal_bondhu_database);
   const products_collection = db.collection(db_collections.products);
 
