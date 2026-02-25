@@ -1932,6 +1932,21 @@ app.get("/search/:keyword", async (req, res) => {
   res.send(result);
 });
 
+app.get("/search_by_keyword/:keyword", async (req, res) => {
+  const client = await dbConnect();
+  const db = client.db(db_database.deal_bondhu_database);
+  const products_collection = db.collection(db_collections.products);
+
+  const keyword = decodeURIComponent(req.params.keyword);
+  
+  const results = await products_collection
+    .find({ title: { $regex: keyword, $options: "i" } })
+    .limit(5)
+    .toArray();
+
+  res.json(results);
+});
+
 // app.get("/operation", async (req, res) => {
 //   const client = await dbConnect();
 //   const db = client.db(db_database.deal_bondhu_database);
