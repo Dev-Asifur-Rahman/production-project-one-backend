@@ -16,6 +16,8 @@ const {
   db_database,
   db_collections,
 } = require("./config/dealBondhuDB.js");
+
+const { collections, connectDb, databases } = require("./config/mongodb.js");
 const archiveChecker = require("./middleware/archiveChecker.js");
 const archive_product_delete = require("./middleware/archiveProductDelete.js");
 const sendMail = require("./utils/sendEmail.js");
@@ -87,20 +89,23 @@ app.get("/clicked_user_data", async (req, res) => {
   }
 });
 
+
+// done 
 app.get("/admin_get_products", async (req, res) => {
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const product_collection = db.collection(db_collections.products);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const product_collection = db.collection(collections.products);
   const result = await product_collection.find({}).toArray();
   res.send(result);
 });
 
+// done 
 app.get("/admin_get_product/:id", async (req, res) => {
   const { id } = req.params;
 
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const product_collection = db.collection(db_collections.products);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const product_collection = db.collection(collections.products);
 
   const product = await product_collection.findOne({ _id: new ObjectId(id) });
 
@@ -148,6 +153,7 @@ app.patch("/update_existing_product/:id", async (req, res) => {
   res.send(result);
 });
 
+// done 
 app.get("/get_products/:category", async (req, res) => {
   const rawCategory = req.params.category;
   const rawSubcategory = req.query.subcategory;
@@ -157,12 +163,12 @@ app.get("/get_products/:category", async (req, res) => {
     ? decodeURIComponent(rawSubcategory).toLowerCase()
     : null;
 
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
 
-  const product_collections = db.collection(db_collections.products);
-  const liked_products = db.collection(db_collections.liked_products);
-  const commented_products = db.collection(db_collections.product_comments);
+  const product_collections = db.collection(collections.products);
+  const liked_products = db.collection(collections.liked_products);
+  const commented_products = db.collection(collections.product_comments);
 
   const filter = { category };
 
@@ -187,21 +193,22 @@ app.get("/get_products/:category", async (req, res) => {
   res.send(result);
 });
 
+// done 
 app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
   const visitor_id = req.headers["x-visitor-id"];
 
-  const db_client = await dbConnect();
+  const db_client = await connectDb();
 
-  const db_db = db_client.db(db_database.deal_bondhu_database);
+  const db_db = db_client.db(databases.deal_bondhu);
 
-  const product_collection = db_db.collection(db_collections.products);
-  const liked_collection = db_db.collection(db_collections.liked_products);
-  const clicked_collection = db_db.collection(db_collections.clicked_products);
-  const unliked_collection = db_db.collection(db_collections.unliked_products);
-  const comment_collection = db_db.collection(db_collections.product_comments);
+  const product_collection = db_db.collection(collections.products);
+  const liked_collection = db_db.collection(collections.liked_products);
+  const clicked_collection = db_db.collection(collections.clicked_products);
+  const unliked_collection = db_db.collection(collections.unliked_products);
+  const comment_collection = db_db.collection(collections.product_comments);
   const saved_product_collection = db_db.collection(
-    db_collections.saved_products,
+    collections.saved_products,
   );
 
   let liked = false;
@@ -1938,7 +1945,7 @@ app.get("/search_by_keyword/:keyword", async (req, res) => {
   const products_collection = db.collection(db_collections.products);
 
   const keyword = decodeURIComponent(req.params.keyword);
-  
+
   const results = await products_collection
     .find({ title: { $regex: keyword, $options: "i" } })
     .limit(5)

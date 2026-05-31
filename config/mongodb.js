@@ -3,10 +3,21 @@ const databases = {
 };
 
 const collections = {
+  archive_products: "archive_products",
+  users: "users",
+  pending_products: "pending_products",
+  banners: "banners",
+  categories: "categories",
+  product_comments: "product_comments",
+  unliked_products: "unliked_products",
+  saved_products: "saved_products",
   clicked_user_info_collection: "clicked_user_info",
   products: "products",
-  clicked_products : 'clicked_products',
-  liked_products : "liked_products"
+  clicked_products: "clicked_products",
+  liked_products: "liked_products",
+  swiper_speed: "swiper_speed",
+  heading_marquee_collection: "heading_marquee_collection",
+  intent_score: "intent_score",
 };
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
@@ -35,7 +46,7 @@ async function connectDb() {
   if (!isConnected) {
     await client.connect();
     isConnected = true;
-    console.log('Connect to Database')
+    console.log("Connect to own Database");
   }
 
   return client;

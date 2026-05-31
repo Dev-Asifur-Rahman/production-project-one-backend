@@ -44,7 +44,6 @@ async function dbConnect() {
   if (!isConnected) {
     await client.connect();
     isConnected = true;
-    console.log("Connected to deal bondhu Database");
   }
 
   return client;
