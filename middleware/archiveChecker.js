@@ -3,16 +3,17 @@ const {
   db_database,
   db_collections,
 } = require("../config/dealBondhuDB");
+const { databases, connectDb, collections } = require("../config/mongodb");
 
 const archiveChecker = async (req, res, next) => {
   const now = new Date();
 
-  const db_client = await dbConnect();
+  const db_client = await connectDb();
 
-  const db_db = db_client.db(db_database.deal_bondhu_database);
+  const db_db = db_client.db(databases.deal_bondhu);
 
-  const product_collection = db_db.collection(db_collections.products);
-  const archived_collection = db_db.collection(db_collections.archive_products);
+  const product_collection = db_db.collection(collections.products);
+  const archived_collection = db_db.collection(collections.archive_products);
 
   const expiredProducts = await product_collection
     .find({ archive_at: { $lte: now } })

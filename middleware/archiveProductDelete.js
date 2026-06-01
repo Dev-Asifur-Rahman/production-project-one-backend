@@ -4,11 +4,12 @@ const {
   db_database,
   db_collections,
 } = require("../config/dealBondhuDB");
+const { connectDb, databases, collections } = require("../config/mongodb");
 
 const archive_product_delete = async (req, res, next) => {
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const archive_collection = db.collection(db_collections.archive_products);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const archive_collection = db.collection(collections.archive_products);
 
   const now = new Date();
 
