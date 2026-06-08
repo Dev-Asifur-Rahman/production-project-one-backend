@@ -1211,15 +1211,6 @@ app.delete("/delete_subcategory/:id", async (req, res) => {
   }
 });
 
-app.get("/banners", async (req, res) => {
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const banner_collections = db.collection(collections.banners);
-
-  const result = await banner_collections.find({}).sort({ order: 1 }).toArray();
-
-  res.send(result);
-});
 
 app.post("/upload_banner", async (req, res) => {
   const object = req.body;

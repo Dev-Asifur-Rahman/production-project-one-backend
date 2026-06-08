@@ -2,6 +2,9 @@ const databases = {
   deal_bondhu: "deal_bondhu",
 };
 
+const dns = require("dns");
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+
 const collections = {
   archive_products: "archive_products",
   users: "users",
@@ -46,7 +49,6 @@ async function connectDb() {
   if (!isConnected) {
     await client.connect();
     isConnected = true;
-    console.log("Connect to own Database");
   }
 
   return client;
