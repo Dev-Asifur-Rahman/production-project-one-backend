@@ -1211,25 +1211,6 @@ app.delete("/delete_subcategory/:id", async (req, res) => {
   }
 });
 
-
-app.post("/upload_banner", async (req, res) => {
-  const object = req.body;
-
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const banner_collections = db.collection(collections.banners);
-  const total_documents = await banner_collections.countDocuments();
-
-  const banner = {
-    ...object,
-    order: total_documents + 1,
-    created_at: new Date(),
-  };
-
-  const result = await banner_collections.insertOne(banner);
-  res.send(result);
-});
-
 app.patch("/banner_sort", async (req, res) => {
   const id = req.query.id;
   const sort_type = req.query.sort;
