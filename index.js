@@ -1211,52 +1211,6 @@ app.delete("/delete_subcategory/:id", async (req, res) => {
   }
 });
 
-app.patch("/banner_sort", async (req, res) => {
-  const id = req.query.id;
-  const sort_type = req.query.sort;
-
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const banner_collections = db.collection(collections.banners);
-
-  const current = await banner_collections.findOne({ _id: new ObjectId(id) });
-
-  if (!current) {
-    return res.send({ message: "Banner not found" });
-  }
-
-  const targetOrder =
-    sort_type === "up"
-      ? current.order - 1
-      : sort_type === "down"
-        ? current.order + 1
-        : null;
-
-  if (targetOrder === null) {
-    return res.send({ message: "Invalid sort type" });
-  }
-
-  if (targetOrder < 1) {
-    return res.send({ success: false, message: "Already at top" });
-  }
-
-  const swap_banner = await banner_collections.findOne({ order: targetOrder });
-  if (!swap_banner) {
-    return res.send({ success: false, message: "banner already in bottom" });
-  }
-
-  await banner_collections.updateOne(
-    { _id: swap_banner._id },
-    { $set: { order: current.order } },
-  );
-
-  const result = await banner_collections.updateOne(
-    { _id: current._id },
-    { $set: { order: targetOrder } },
-  );
-
-  res.send(result);
-});
 
 app.delete("/delete_banner/:id", async (req, res) => {
   const { id } = req.params;
