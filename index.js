@@ -1211,26 +1211,6 @@ app.delete("/delete_subcategory/:id", async (req, res) => {
   }
 });
 
-
-app.delete("/delete_banner/:id", async (req, res) => {
-  const { id } = req.params;
-  const client = await connectDb();
-  const db = client.db(databases.deal_bondhu);
-  const banner_collections = db.collection(collections.banners);
-
-  const banner = await banner_collections.find({ _id: new ObjectId(id) });
-
-  if (!banner) {
-    res.send({ success: false, message: "no banner found" });
-  } else {
-    const result = await banner_collections.deleteOne({
-      _id: new ObjectId(id),
-    });
-
-    res.send(result);
-  }
-});
-
 app.post("/upload_saved_product", async (req, res) => {
   const body = req.body;
 
