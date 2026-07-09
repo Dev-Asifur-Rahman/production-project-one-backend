@@ -89,8 +89,7 @@ app.get("/clicked_user_data", async (req, res) => {
   }
 });
 
-
-// done 
+// done
 app.get("/admin_get_products", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -99,7 +98,7 @@ app.get("/admin_get_products", async (req, res) => {
   res.send(result);
 });
 
-// done 
+// done
 app.get("/admin_get_product/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -153,7 +152,7 @@ app.patch("/update_existing_product/:id", async (req, res) => {
   res.send(result);
 });
 
-// done 
+// done
 app.get("/get_products/:category", async (req, res) => {
   const rawCategory = req.params.category;
   const rawSubcategory = req.query.subcategory;
@@ -193,7 +192,7 @@ app.get("/get_products/:category", async (req, res) => {
   res.send(result);
 });
 
-// done 
+// done
 app.get("/get_product/:id", async (req, res) => {
   const id = req.params.id;
   const visitor_id = req.headers["x-visitor-id"];
@@ -207,9 +206,7 @@ app.get("/get_product/:id", async (req, res) => {
   const clicked_collection = db_db.collection(collections.clicked_products);
   const unliked_collection = db_db.collection(collections.unliked_products);
   const comment_collection = db_db.collection(collections.product_comments);
-  const saved_product_collection = db_db.collection(
-    collections.saved_products,
-  );
+  const saved_product_collection = db_db.collection(collections.saved_products);
 
   let liked = false;
   let unliked = false;
@@ -483,14 +480,17 @@ app.post("/upload_click_products", async (req, res) => {
   const find_product = await product_collection.findOne({
     _id: new ObjectId(id),
   });
+
   const userId = find_product?.dealer_id;
 
   const find_user = await users_collections.findOne({ user_id: userId });
+  
   if (find_user) {
     const final_result = await calculatePoints(
       pointCategoryObject.click,
       userId,
     );
+    console.log(final_result)
     res.send(final_result);
   }
 });
@@ -592,7 +592,7 @@ app.get("/popular_deals", async (req, res) => {
   res.send(popular_products);
 });
 
-// retest 
+// retest
 app.get("/trending_categories", async (req, res) => {
   try {
     const client = await connectDb();
@@ -727,7 +727,7 @@ app.get("/trending_categories", async (req, res) => {
   }
 });
 
-// retest 
+// retest
 app.get("/trending_stores", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -869,7 +869,7 @@ app.get("/trending_stores", async (req, res) => {
   res.send(top_products);
 });
 
-// try 
+// try
 app.post("/like_product", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -936,7 +936,7 @@ app.post("/upload_comment", async (req, res) => {
   res.send(result);
 });
 
-// retest 
+// retest
 app.get("/pending_products", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -1007,7 +1007,7 @@ app.patch("/update_pending_product/:id", async (req, res) => {
   res.send(result);
 });
 
-// retest 
+// retest
 app.get("/archive_products", archive_product_delete, async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -1017,7 +1017,7 @@ app.get("/archive_products", archive_product_delete, async (req, res) => {
   res.send(result);
 });
 
-// retest 
+// retest
 app.post("/archive_pending_products/:id", async (req, res) => {
   const { id } = req.params;
   const client = await connectDb();
@@ -1351,7 +1351,7 @@ app.post("/reset_new_password", async (req, res) => {
   }
 });
 
-// retest 
+// retest
 app.get("/leaderboard", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -1366,7 +1366,7 @@ app.get("/leaderboard", async (req, res) => {
   res.send(leaderboard);
 });
 
-// retest 
+// retest
 app.get("/monthly_rising_stars", async (req, res) => {
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
@@ -1376,9 +1376,7 @@ app.get("/monthly_rising_stars", async (req, res) => {
   const clicked_products_collection = db.collection(
     collections.clicked_products,
   );
-  const liked_products_collection = db.collection(
-    collections.liked_products,
-  );
+  const liked_products_collection = db.collection(collections.liked_products);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1519,9 +1517,14 @@ app.post("/calculate_intent_score", async (req, res) => {
     user_id,
     product_id,
   });
-
+  
+  // for development 
+  // const time_zone = geo?.location?.time_zone;
+  // const city = time_zone.split("/")[1] || null;
+ 
+  // for local server 
   const time_zone = geo?.location?.time_zone;
-  const city = time_zone.split("/")[1] || null;
+  const city = time_zone?.split("/")?.[1] ?? null;
 
   let score = 0;
 
@@ -1844,14 +1847,22 @@ app.get("/search_by_keyword/:keyword", async (req, res) => {
 // app.get("/operation", async (req, res) => {
 //   const client = await connectDb();
 //   const db = client.db(databases.deal_bondhu);
-//   const products_collection = db.collection(collections.clicked_products);
+//   const products_collection = db.collection(collections.products);
 
-//   const result = await products_collection.deleteMany({
-//     $or: [{ subcategory: "" }, { subcategory: { $exists: false } }],
-//   });
+//   const result = await products_collection.updateMany(
+//   {
+//     dealer_id: { $exists: false },
+//   },
+//   {
+//     $set: {
+//       dealer_id: "cb7a8089-865b-4280-be47-d6b94df9eaae",
+//     },
+//   }
+// );
 
 //   return res.send({
-//     deletedCount: result.deletedCount,
+//     matchedCount: result.matchedCount,
+//     modifiedCount: result.modifiedCount,
 //   });
 // });
 
