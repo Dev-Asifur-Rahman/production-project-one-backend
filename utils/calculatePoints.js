@@ -1,8 +1,5 @@
-const {
-  dbConnect,
-  db_database,
-  db_collections,
-} = require("../config/dealBondhuDB");
+
+const { connectDb, databases, collections } = require("../config/mongodb");
 
 const pointCategoryObject = { post: "post", click: "click", like: "like" };
 
@@ -15,9 +12,9 @@ const levels = [
 ];
 
 const updateLevelBadgeTitle = async (id, total_points) => {
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const users_collection = db.collection(db_collections.users);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const users_collection = db.collection(collections.users);
 
   let newLevel = levels[0];
   for (const l of levels) {
@@ -38,9 +35,9 @@ const updateLevelBadgeTitle = async (id, total_points) => {
 };
 
 const calculatePoints = async (type, id) => {
-  const client = await dbConnect();
-  const db = client.db(db_database.deal_bondhu_database);
-  const users_collection = db.collection(db_collections.users);
+  const client = await connectDb();
+  const db = client.db(databases.deal_bondhu);
+  const users_collection = db.collection(collections.users);
 
   const pointsToAdd =
     type === "post" ? 50 : type === "click" ? 5 : type === "like" ? 10 : 0;
