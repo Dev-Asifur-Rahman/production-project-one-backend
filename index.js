@@ -1,3 +1,5 @@
+// notes : uncomment 1524 line in local development 
+
 require("dotenv").config();
 
 // route files
@@ -1508,8 +1510,6 @@ app.post("/calculate_intent_score", async (req, res) => {
     subcategory,
   } = body;
 
-  console.log(body)
-
   const client = await connectDb();
   const db = client.db(databases.deal_bondhu);
   const intent_score_collection = db.collection(collections.intent_score);
@@ -1520,12 +1520,12 @@ app.post("/calculate_intent_score", async (req, res) => {
   });
   
   // for development 
-  const time_zone = geo?.location?.time_zone;
-  const city = time_zone.split("/")[1] || null;
+  // const time_zone = geo?.location?.time_zone;
+  // const city = time_zone.split("/")[1] || null;
  
   // for local server 
-  // const time_zone = geo?.location?.time_zone;
-  // const city = time_zone?.split("/")?.[1] ?? null;
+  const time_zone = geo?.location?.time_zone;
+  const city = time_zone?.split("/")?.[1] ?? null;
 
   let score = 0;
 

@@ -1,8 +1,3 @@
-const {
-  dbConnect,
-  db_database,
-  db_collections,
-} = require("../config/dealBondhuDB");
 const { databases, connectDb, collections } = require("../config/mongodb");
 
 const archiveChecker = async (req, res, next) => {
