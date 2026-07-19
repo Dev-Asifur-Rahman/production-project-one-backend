@@ -1,9 +1,4 @@
 const { ObjectId } = require("mongodb");
-const {
-  dbConnect,
-  db_database,
-  db_collections,
-} = require("../config/dealBondhuDB");
 const { connectDb, databases, collections } = require("../config/mongodb");
 
 const archive_product_delete = async (req, res, next) => {
