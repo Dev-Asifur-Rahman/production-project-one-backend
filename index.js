@@ -1,4 +1,7 @@
-// notes : uncomment 1524 line in local development 
+// notes :
+// 1. 1524 line comment uncomment development comment local
+// 2. Recent Clicks(just for you) api 446 line commented. just for you fresh product issues 
+
 
 require("dotenv").config();
 
@@ -437,7 +440,7 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
     const products = await product_collection
       .find({
         subcategory: topSubcategories[i],
-        created_at: { $gte: new Date(Date.now() - SIXTY_DAYS) },
+        // created_at: { $gte: new Date(Date.now() - SIXTY_DAYS) },
         _id: { $nin: Array.from(usedIds) },
       })
       .sort({ created_at: -1 })
@@ -457,7 +460,6 @@ app.post("/recent_clicks", archiveChecker, async (req, res) => {
       product_id: product._id.toString(),
     });
   }
-
   return res.send(finalProducts);
 });
 
@@ -1518,14 +1520,13 @@ app.post("/calculate_intent_score", async (req, res) => {
     user_id,
     product_id,
   });
-  
-  // for development 
-  // const time_zone = geo?.location?.time_zone;
-  // const city = time_zone.split("/")[1] || null;
- 
-  // for local server 
-  const time_zone = geo?.location?.time_zone;
-  const city = time_zone?.split("/")?.[1] ?? null;
+
+  // for development
+  // const time_zone = geo?.location?.time_zone || null;
+  // const city = time_zone ? time_zone.split("/")[1] || null : "Dhaka";
+
+  // for local server
+  const city = "Dhaka";
 
   let score = 0;
 
@@ -1533,6 +1534,7 @@ app.post("/calculate_intent_score", async (req, res) => {
     if (!find_intent_document) {
       let intentHourBoolean = false;
       const hour = new Date().getHours();
+
       if (hour >= 18 && hour <= 22) {
         intentHourBoolean = true;
       }
@@ -1547,7 +1549,6 @@ app.post("/calculate_intent_score", async (req, res) => {
 
       score += userVisited(false);
 
-      // add for location and device by default
       device === "desktop" && (score += 5);
       intentHourBoolean && (score += 10);
       ["Dhaka", "Chittagong"].includes(city) && (score += 5);
@@ -1576,14 +1577,17 @@ app.post("/calculate_intent_score", async (req, res) => {
         updated_at: new Date(),
         previousData,
       };
+
       const result = await intent_score_collection.insertOne(
         create_intent_document,
       );
+
       return res.send({ success: true, result });
     } else if (find_intent_document) {
       const { visited } = find_intent_document;
 
-      let { intent_score: updatedScore, previousData } = find_intent_document;
+      let { intent_score: updatedScore, previousData } =
+        find_intent_document;
 
       const { deviceUpdatedScore, device: modified_device } = deviceScore(
         device,
@@ -1591,7 +1595,10 @@ app.post("/calculate_intent_score", async (req, res) => {
         previousData,
       );
 
-      let { location: modified_location, updateLocationScore } = locationScore(
+      let {
+        location: modified_location,
+        updateLocationScore,
+      } = locationScore(
         city,
         deviceUpdatedScore,
         previousData,
@@ -1599,10 +1606,10 @@ app.post("/calculate_intent_score", async (req, res) => {
 
       if (visited + 1 === 3) updateLocationScore += 10;
 
-      let { timeUpdatedScore, visit_time: modified_visit_time } = timeScore(
-        updateLocationScore,
-        previousData,
-      );
+      let {
+        timeUpdatedScore,
+        visit_time: modified_visit_time,
+      } = timeScore(updateLocationScore, previousData);
 
       const finalScore = timeUpdatedScore;
       const intent_level = intentLevelCalculator(finalScore);
@@ -1632,8 +1639,11 @@ app.post("/calculate_intent_score", async (req, res) => {
       return res.send({ success: true, session });
     }
   } else if (session === "scrolled") {
-    let { intent_score: currentScore, intent_level: currentLevel } =
-      find_intent_document;
+    let {
+      intent_score: currentScore,
+      intent_level: currentLevel,
+    } = find_intent_document;
+
     currentScore += 10;
 
     const intent_level = intentLevelCalculator(currentScore);
@@ -1650,11 +1660,18 @@ app.post("/calculate_intent_score", async (req, res) => {
       },
     );
   } else if (session === "visited") {
-    let { intent_score: currentScore, previousData } = find_intent_document;
+    let {
+      intent_score: currentScore,
+      previousData,
+    } = find_intent_document;
+
     const { site_visited } = previousData;
+
     if (!site_visited) {
       currentScore += 10;
+
       const intent_level = intentLevelCalculator(currentScore);
+
       await intent_score_collection.updateOne(
         { user_id, product_id },
         {
@@ -1674,7 +1691,11 @@ app.post("/calculate_intent_score", async (req, res) => {
       );
     }
   } else if (session === "leave") {
-    const { intent_score, lastVisited, previousData } = find_intent_document;
+    const {
+      intent_score,
+      lastVisited,
+      previousData,
+    } = find_intent_document;
 
     let updatedScore = intent_score;
 
@@ -1683,7 +1704,11 @@ app.post("/calculate_intent_score", async (req, res) => {
       timeSpent,
       time_spent: modified_time_spent,
       updatedTimeScore,
-    } = spentTimeScore(lastVisited, updatedScore, previousData);
+    } = spentTimeScore(
+      lastVisited,
+      updatedScore,
+      previousData,
+    );
 
     const intent_level = intentLevelCalculator(updatedTimeScore);
 
@@ -1692,7 +1717,8 @@ app.post("/calculate_intent_score", async (req, res) => {
       {
         $set: {
           lastLeft: leaveTime,
-          total_time_spent: find_intent_document.total_time_spent + timeSpent,
+          total_time_spent:
+            find_intent_document.total_time_spent + timeSpent,
           intent_score: updatedTimeScore,
           intent_level: intent_level,
           updated_at: new Date(),
